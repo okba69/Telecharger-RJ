@@ -1,0 +1,158 @@
+/* Rocket Launch Animation */
+@keyframes rocket-launch {
+  0% {
+    transform: translateY(0) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  30% {
+    transform: translateY(-20vh) scale(1.2) rotate(5deg);
+    opacity: 1;
+  }
+  60% {
+    transform: translateY(-60vh) scale(0.5) rotate(-10deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-100vh) scale(0.1) rotate(15deg);
+    opacity: 0;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(168, 85, 247, 0.8);
+  }
+}
+
+@keyframes confetti {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes progress-spin {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -502;
+  }
+}
+
+/* Rocket Overlay */
+.rocket-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: radial-gradient(circle at center, rgba(0,0,0,0.8), rgba(0,0,0,0.95));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade-in 0.3s ease-out;
+}
+
+.rocket {
+  font-size: 120px;
+  animation: rocket-launch 1.5s ease-in-out forwards;
+  filter: drop-shadow(0 0 30px rgba(255, 100, 100, 0.8));
+}
+
+/* Focus Mode Animations */
+.focus-fade-in {
+  animation: fade-in-up 0.6s ease-out;
+}
+
+.focus-zoom-in {
+  animation: zoom-in 0.5s ease-out;
+}
+
+.pulse-border {
+  animation: pulse-glow 2s infinite;
+}
+
+/* Confetti */
+.confetti-piece {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  animation: confetti 3s ease-out forwards;
+  z-index: 10000;
+}
+
+/* Progress Circle */
+.progress-ring {
+  transform: rotate(-90deg);
+}
+
+.progress-ring__circle {
+  transition: stroke-dashoffset 0.35s;
+  transform-origin: 50% 50%;
+}
+
+/* Smooth transitions */
+.transition-all-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Breathing animation for focus mode */
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.breathe {
+  animation: breathe 4s ease-in-out infinite;
+}
+
+/* Star particles */
+@keyframes star-twinkle {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+}
+
+.star {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  animation: star-twinkle 2s ease-in-out infinite;
+}
