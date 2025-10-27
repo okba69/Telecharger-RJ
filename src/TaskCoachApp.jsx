@@ -527,6 +527,23 @@ function TaskCoachApp() {
     setTasks([...tasks, newTask])
   }
 
+  const handleSelectTaskFromHistory = (e) => {
+    const taskTitle = e.target.value
+    if (!taskTitle) {
+      setNewTaskTitle('')
+      setNewTaskDescription('')
+      setNewTaskEstimate(30)
+      return
+    }
+
+    const selectedTask = taskHistory.find(t => t.title === taskTitle)
+    if (selectedTask) {
+      setNewTaskTitle(selectedTask.title)
+      setNewTaskDescription(selectedTask.description)
+      setNewTaskEstimate(selectedTask.estimateMinutes)
+    }
+  }
+
   const handleDeleteTask = (taskId, e) => {
     e.stopPropagation()
     if (activeTaskId === taskId) {
@@ -798,6 +815,26 @@ function TaskCoachApp() {
                 <h2 className="text-lg font-semibold mb-4">➕ Nouvelle tâche</h2>
 
                 <form onSubmit={handleAddTask} className="space-y-3">
+                  {/* Task History Selector */}
+                  {taskHistory.length > 0 && (
+                    <div>
+                      <label className="block text-xs text-neutral-400 mb-1">
+                        Ou sélectionner une ancienne tâche
+                      </label>
+                      <select
+                        onChange={handleSelectTaskFromHistory}
+                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">-- Nouvelle tâche --</option>
+                        {taskHistory.map((histTask, idx) => (
+                          <option key={idx} value={histTask.title}>
+                            {histTask.title} ({histTask.estimateMinutes}min)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <input
                     type="text"
                     value={newTaskTitle}
@@ -833,36 +870,6 @@ function TaskCoachApp() {
                     </button>
                   </div>
                 </form>
-
-                {/* Task History / Templates */}
-                {taskHistory.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-neutral-800">
-                    <h3 className="text-sm font-semibold mb-3 text-neutral-400">📋 Historique des tâches</h3>
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {taskHistory.slice(0, 10).map((histTask, idx) => (
-                        <div
-                          key={idx}
-                          className="bg-neutral-900 border border-neutral-800 rounded-lg p-2 flex justify-between items-start group hover:border-neutral-700 transition-colors"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium truncate">{histTask.title}</p>
-                            {histTask.description && (
-                              <p className="text-[10px] text-neutral-500 truncate">{histTask.description}</p>
-                            )}
-                            <p className="text-[10px] text-neutral-600">{histTask.estimateMinutes}min</p>
-                          </div>
-                          <button
-                            onClick={() => recreateTaskFromHistory(histTask)}
-                            className="ml-2 text-xs text-blue-400 hover:text-blue-300 transition-colors opacity-0 group-hover:opacity-100"
-                            title="Recréer cette tâche"
-                          >
-                            ↻
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
