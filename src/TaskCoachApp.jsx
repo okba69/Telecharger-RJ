@@ -200,30 +200,62 @@ function TaskCoachApp() {
 
       const audioContext = new (window.AudioContext || window.webkitAudioContext)()
 
-      // Create two oscillators for a richer ambient sound
-      const osc1 = audioContext.createOscillator()
-      const osc2 = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
+      // Create multiple oscillators for rich, dynamic ambient sound
+      // Using pentatonic scale frequencies for pleasant harmony
+      const frequencies = [
+        261.63, // C4
+        293.66, // D4
+        329.63, // E4
+        392.00, // G4
+        440.00  // A4
+      ]
 
-      osc1.connect(gainNode)
-      osc2.connect(gainNode)
-      gainNode.connect(audioContext.destination)
+      const oscillators = []
+      const gainNodes = []
+      const lfos = []
 
-      // Gentle frequencies (C and G notes in lower octave)
-      osc1.frequency.value = 130.81 // C3
-      osc2.frequency.value = 196.00 // G3
-      osc1.type = 'sine'
-      osc2.type = 'sine'
+      frequencies.forEach((freq, index) => {
+        // Main oscillator
+        const osc = audioContext.createOscillator()
+        const gain = audioContext.createGain()
 
-      // Very quiet volume
-      gainNode.gain.setValueAtTime(0.03, audioContext.currentTime)
+        // LFO for volume modulation (creates breathing effect)
+        const lfo = audioContext.createOscillator()
+        const lfoGain = audioContext.createGain()
 
-      osc1.start()
-      osc2.start()
+        osc.type = 'sine'
+        osc.frequency.value = freq
+
+        // Add slight detune for chorus effect
+        osc.detune.value = (Math.random() - 0.5) * 10
+
+        // LFO setup - different speeds for each oscillator
+        lfo.type = 'sine'
+        lfo.frequency.value = 0.1 + (index * 0.05) // 0.1 to 0.3 Hz
+        lfoGain.gain.value = 0.008 // Modulation depth
+
+        lfo.connect(lfoGain)
+        lfoGain.connect(gain.gain)
+
+        // Base gain - stagger the volumes
+        gain.gain.setValueAtTime(0.015 + (index * 0.002), audioContext.currentTime)
+
+        osc.connect(gain)
+        gain.connect(audioContext.destination)
+
+        // Start with delay for cascading effect
+        const startTime = audioContext.currentTime + (index * 0.3)
+        osc.start(startTime)
+        lfo.start(startTime)
+
+        oscillators.push(osc)
+        gainNodes.push(gain)
+        lfos.push(lfo)
+      })
 
       // Store refs for cleanup
-      ambientOscillatorRef.current = [osc1, osc2, audioContext]
-      ambientGainNodeRef.current = gainNode
+      ambientOscillatorRef.current = [...oscillators, ...lfos, audioContext]
+      ambientGainNodeRef.current = gainNodes
     } catch (error) {
       console.log('Ambient audio not supported')
     }
@@ -231,10 +263,15 @@ function TaskCoachApp() {
 
   const stopAmbientMusic = () => {
     if (ambientOscillatorRef.current) {
-      const [osc1, osc2, audioContext] = ambientOscillatorRef.current
       try {
-        osc1.stop()
-        osc2.stop()
+        const allNodes = ambientOscillatorRef.current
+        const audioContext = allNodes[allNodes.length - 1]
+
+        // Stop all oscillators and LFOs
+        for (let i = 0; i < allNodes.length - 1; i++) {
+          allNodes[i].stop()
+        }
+
         audioContext.close()
       } catch (error) {
         console.log('Error stopping ambient music')
