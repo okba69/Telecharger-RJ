@@ -22,7 +22,7 @@ function TaskCoachApp() {
   const [isRunning, setIsRunning] = useState(false)
   const lastTickRef = useRef(Date.now())
 
-  // Inbox
+  // Inbox (renamed to "À faire")
   const [inboxItems, setInboxItems] = useState(() => loadFromStorage('inboxItems', []))
   const [newInboxItem, setNewInboxItem] = useState('')
 
@@ -36,11 +36,40 @@ function TaskCoachApp() {
   const [energyLevel, setEnergyLevel] = useState(() => loadFromStorage('energyLevel', 5))
   const [satisfactionLevel, setSatisfactionLevel] = useState(() => loadFromStorage('satisfactionLevel', 5))
 
-  // Focus mode
+  // Focus mode & Pomodoro
   const [isFocusMode, setIsFocusMode] = useState(false)
+  const [pomodoroMode, setPomodoroMode] = useState('work') // 'work' | 'break'
+  const [pomodoroSeconds, setPomodoroSeconds] = useState(25 * 60) // 25 minutes
+  const [isPomodoroRunning, setIsPomodoroRunning] = useState(false)
+  const pomodoroTickRef = useRef(Date.now())
+  const [motivationalMessage, setMotivationalMessage] = useState('')
+  const [pomodoroCount, setPomodoroCount] = useState(0)
 
   // Drag and drop
   const [draggedTask, setDraggedTask] = useState(null)
+  const [draggedInboxItem, setDraggedInboxItem] = useState(null)
+
+  // Audio
+  const audioContextRef = useRef(null)
+
+  // Motivational messages
+  const motivationalMessages = [
+    "💪 Vous êtes sur la bonne voie ! Continue comme ça !",
+    "🚀 Chaque minute compte. Restez concentré !",
+    "🎯 La discipline bat le talent. Keep going !",
+    "⚡ Vous êtes une machine de productivité !",
+    "🔥 Le succès est la somme de petits efforts répétés !",
+    "🌟 Excellent travail ! Vous progressez !",
+    "💎 La concentration est votre super-pouvoir !",
+    "🎪 Un pas à la fois vers l'excellence !",
+    "⭐ Vous dominez cette tâche !",
+    "🏆 Champion de la productivité en action !",
+    "🧠 Focus maximal = Résultats maximaux !",
+    "💯 Vous êtes inarrêtable aujourd'hui !",
+    "🎨 Créez votre chef-d'œuvre, une tâche à la fois !",
+    "🌈 Votre futur moi vous remercie !",
+    "⚔️ Warrior mode : ACTIVÉ !"
+  ]
 
   // ========== PERSISTENCE ==========
   useEffect(() => {
@@ -85,6 +114,116 @@ function TaskCoachApp() {
 
     return () => clearInterval(interval)
   }, [isRunning, activeTaskId])
+
+  // ========== POMODORO TIMER ==========
+  useEffect(() => {
+    if (!isPomodoroRunning) return
+
+    const interval = setInterval(() => {
+      const now = Date.now()
+      const deltaSeconds = Math.floor((now - pomodoroTickRef.current) / 1000)
+
+      if (deltaSeconds >= 1) {
+        setPomodoroSeconds(prev => {
+          const newSeconds = prev - deltaSeconds
+          if (newSeconds <= 0) {
+            // Timer finished
+            playNotificationSound()
+            if (pomodoroMode === 'work') {
+              setPomodoroMode('break')
+              setPomodoroSeconds(5 * 60) // 5 min break
+              setPomodoroCount(prev => prev + 1)
+              setMotivationalMessage('🎉 Excellent travail ! Prenez une pause bien méritée !')
+            } else {
+              setPomodoroMode('work')
+              setPomodoroSeconds(25 * 60) // 25 min work
+              const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
+              setMotivationalMessage(randomMsg)
+            }
+            return pomodoroMode === 'work' ? 5 * 60 : 25 * 60
+          }
+          return newSeconds
+        })
+        pomodoroTickRef.current = now
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [isPomodoroRunning, pomodoroMode])
+
+  // Generate motivational message periodically
+  useEffect(() => {
+    if (!isFocusMode) return
+
+    const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
+    setMotivationalMessage(randomMsg)
+
+    const interval = setInterval(() => {
+      const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
+      setMotivationalMessage(randomMsg)
+    }, 120000) // Every 2 minutes
+
+    return () => clearInterval(interval)
+  }, [isFocusMode])
+
+  // ========== AUDIO ==========
+  const playNotificationSound = () => {
+    try {
+      // Create a simple beep sound using Web Audio API
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+
+      oscillator.frequency.value = 800
+      oscillator.type = 'sine'
+
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
+
+      oscillator.start(audioContext.currentTime)
+      oscillator.stop(audioContext.currentTime + 0.5)
+    } catch (error) {
+      console.log('Audio not supported')
+    }
+  }
+
+  const playBackgroundMusic = () => {
+    // Simple ambient sound using Web Audio API
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
+      }
+
+      const audioContext = audioContextRef.current
+      const oscillator1 = audioContext.createOscillator()
+      const oscillator2 = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+
+      oscillator1.connect(gainNode)
+      oscillator2.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+
+      oscillator1.frequency.value = 432 // Relaxing frequency
+      oscillator2.frequency.value = 528 // Healing frequency
+      oscillator1.type = 'sine'
+      oscillator2.type = 'sine'
+
+      gainNode.gain.setValueAtTime(0.05, audioContext.currentTime)
+
+      oscillator1.start()
+      oscillator2.start()
+
+      return () => {
+        oscillator1.stop()
+        oscillator2.stop()
+      }
+    } catch (error) {
+      console.log('Audio not supported')
+    }
+  }
 
   // ========== TASK ACTIONS ==========
   const handleTaskClick = (taskId) => {
@@ -163,7 +302,7 @@ function TaskCoachApp() {
     )
   }
 
-  // ========== DRAG AND DROP ==========
+  // ========== DRAG AND DROP TASKS ==========
   const handleDragStart = (e, task) => {
     setDraggedTask(task)
     e.dataTransfer.effectAllowed = 'move'
@@ -193,17 +332,86 @@ function TaskCoachApp() {
     setDraggedTask(null)
   }
 
-  // ========== INBOX ==========
+  // ========== INBOX (À FAIRE) ==========
   const handleAddInboxItem = (e) => {
     e.preventDefault()
     if (!newInboxItem.trim()) return
 
-    setInboxItems([...inboxItems, { id: Date.now(), text: newInboxItem }])
+    setInboxItems([...inboxItems, { id: Date.now(), text: newInboxItem, completed: false }])
     setNewInboxItem('')
+  }
+
+  const handleToggleInboxItem = (id) => {
+    setInboxItems(inboxItems.map(item =>
+      item.id === id ? { ...item, completed: !item.completed } : item
+    ))
   }
 
   const handleRemoveInboxItem = (id) => {
     setInboxItems(inboxItems.filter(item => item.id !== id))
+  }
+
+  // Drag and drop for inbox
+  const handleInboxDragStart = (e, item) => {
+    setDraggedInboxItem(item)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleInboxDrop = (e, targetItem) => {
+    e.preventDefault()
+    if (!draggedInboxItem || draggedInboxItem.id === targetItem.id) return
+
+    const draggedIndex = inboxItems.findIndex(i => i.id === draggedInboxItem.id)
+    const targetIndex = inboxItems.findIndex(i => i.id === targetItem.id)
+
+    const newItems = [...inboxItems]
+    newItems.splice(draggedIndex, 1)
+    newItems.splice(targetIndex, 0, draggedInboxItem)
+
+    setInboxItems(newItems)
+    setDraggedInboxItem(null)
+  }
+
+  const handleInboxDragEnd = () => {
+    setDraggedInboxItem(null)
+  }
+
+  // ========== FOCUS MODE ==========
+  const toggleFocusMode = () => {
+    if (!isFocusMode && activeTaskId) {
+      // Starting focus mode
+      setIsFocusMode(true)
+      setPomodoroMode('work')
+      setPomodoroSeconds(25 * 60)
+      setIsPomodoroRunning(true)
+      pomodoroTickRef.current = Date.now()
+      const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
+      setMotivationalMessage(randomMsg)
+      // Start background music (optional)
+      const stopMusic = playBackgroundMusic()
+      return stopMusic
+    } else {
+      // Stopping focus mode
+      setIsFocusMode(false)
+      setIsPomodoroRunning(false)
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+        audioContextRef.current = null
+      }
+    }
+  }
+
+  const handlePomodoroToggle = () => {
+    setIsPomodoroRunning(!isPomodoroRunning)
+    if (!isPomodoroRunning) {
+      pomodoroTickRef.current = Date.now()
+    }
+  }
+
+  const handlePomodoroReset = () => {
+    setPomodoroMode('work')
+    setPomodoroSeconds(25 * 60)
+    setIsPomodoroRunning(false)
   }
 
   // ========== KPI CALCULATIONS ==========
@@ -236,12 +444,130 @@ function TaskCoachApp() {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
+  const formatPomodoroTime = (seconds) => {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+  }
+
   const activeTask = tasks.find(t => t.id === activeTaskId)
 
   // Time options in 15 min increments
   const timeOptions = [15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240]
 
-  // ========== RENDER ==========
+  // ========== FOCUS MODE FULL SCREEN ==========
+  if (isFocusMode && activeTask) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 text-white flex items-center justify-center p-6">
+        <div className="max-w-4xl w-full">
+          {/* Exit Focus Mode */}
+          <div className="text-right mb-6">
+            <button
+              onClick={toggleFocusMode}
+              className="text-sm text-white/60 hover:text-white transition-colors"
+            >
+              ✕ Quitter le mode focus
+            </button>
+          </div>
+
+          {/* Pomodoro Timer */}
+          <div className="text-center mb-12">
+            <div className="inline-block bg-black/30 backdrop-blur-lg rounded-3xl p-8 mb-6">
+              <div className="text-sm text-white/60 mb-2 uppercase tracking-wider">
+                {pomodoroMode === 'work' ? '🎯 Travail Focus' : '☕ Pause'}
+              </div>
+              <div className="text-8xl font-bold font-mono mb-4">
+                {formatPomodoroTime(pomodoroSeconds)}
+              </div>
+              <div className="flex gap-4 justify-center">
+                <button
+                  onClick={handlePomodoroToggle}
+                  className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors"
+                >
+                  {isPomodoroRunning ? '⏸️ Pause' : '▶️ Démarrer'}
+                </button>
+                <button
+                  onClick={handlePomodoroReset}
+                  className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-medium transition-colors"
+                >
+                  🔄 Reset
+                </button>
+              </div>
+            </div>
+
+            {/* Pomodoro Count */}
+            <div className="text-white/60 text-sm">
+              🍅 Pomodoros complétés aujourd'hui : {pomodoroCount}
+            </div>
+          </div>
+
+          {/* Task Info */}
+          <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 mb-8">
+            <h1 className="text-4xl font-bold mb-4">{activeTask.title}</h1>
+            <p className="text-xl text-white/80 mb-6">{activeTask.description}</p>
+
+            <div className="flex justify-between items-center text-sm">
+              <div>
+                <span className="text-white/60">Estimé:</span>
+                <span className="ml-2 font-semibold">{activeTask.estimateMinutes} min</span>
+              </div>
+              <div>
+                <span className="text-white/60">Temps réel:</span>
+                <span className="ml-2 font-semibold">{formatTime(activeTask.secondsSpent)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Motivational Message */}
+          {motivationalMessage && (
+            <div className="text-center mb-8 animate-pulse">
+              <div className="inline-block bg-gradient-to-r from-yellow-400/20 to-orange-400/20 backdrop-blur-lg rounded-2xl px-8 py-4">
+                <p className="text-2xl font-semibold">{motivationalMessage}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Task Controls */}
+          <div className="flex gap-4 justify-center">
+            {isRunning ? (
+              <button
+                onClick={handlePause}
+                className="px-8 py-4 bg-yellow-500 hover:bg-yellow-600 rounded-xl font-semibold text-lg transition-colors"
+              >
+                ⏸️ Pause Tâche
+              </button>
+            ) : (
+              <button
+                onClick={handleResume}
+                className="px-8 py-4 bg-green-500 hover:bg-green-600 rounded-xl font-semibold text-lg transition-colors"
+              >
+                ▶️ Reprendre Tâche
+              </button>
+            )}
+            <button
+              onClick={handleComplete}
+              className="px-8 py-4 bg-emerald-500 hover:bg-emerald-600 rounded-xl font-semibold text-lg transition-colors"
+            >
+              ✅ Terminer
+            </button>
+          </div>
+
+          {/* Block Note in Focus Mode */}
+          <div className="mt-8">
+            <textarea
+              value={activeTask.blockNote}
+              onChange={handleBlockNoteChange}
+              placeholder="Notes ou blocages..."
+              rows="3"
+              className="w-full bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/40"
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ========== NORMAL VIEW ==========
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-neutral-200">
       {/* Header */}
@@ -277,9 +603,9 @@ function TaskCoachApp() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* ========== COLUMN A: PLANIFIER ========== */}
             <div className="space-y-6">
-              {/* Inbox */}
+              {/* À faire (Inbox with checkbox) */}
               <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6">
-                <h2 className="text-lg font-semibold mb-4">📥 Inbox rapide</h2>
+                <h2 className="text-lg font-semibold mb-4">✅ À faire</h2>
 
                 <form onSubmit={handleAddInboxItem} className="mb-4">
                   <div className="flex gap-2">
@@ -288,7 +614,7 @@ function TaskCoachApp() {
                       value={newInboxItem}
                       onChange={(e) => setNewInboxItem(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddInboxItem(e)}
-                      placeholder="Yannick demande X..."
+                      placeholder="Ajouter une chose à faire..."
                       className="flex-1 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <button
@@ -302,18 +628,37 @@ function TaskCoachApp() {
 
                 <div className="space-y-2">
                   {inboxItems.map(item => (
-                    <div key={item.id} className="bg-neutral-900 border border-neutral-800 rounded-lg p-3 flex justify-between items-center">
-                      <p className="text-sm">{item.text}</p>
+                    <div
+                      key={item.id}
+                      draggable
+                      onDragStart={(e) => handleInboxDragStart(e, item)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleInboxDrop(e, item)}
+                      onDragEnd={handleInboxDragEnd}
+                      className={`bg-neutral-900 border border-neutral-800 rounded-lg p-3 flex items-center gap-3 cursor-move transition-all ${
+                        draggedInboxItem?.id === item.id ? 'opacity-50' : ''
+                      }`}
+                    >
+                      <span className="text-neutral-600 text-xs cursor-grab">⋮⋮</span>
+                      <input
+                        type="checkbox"
+                        checked={item.completed}
+                        onChange={() => handleToggleInboxItem(item.id)}
+                        className="w-4 h-4 rounded border-neutral-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                      />
+                      <p className={`text-sm flex-1 ${item.completed ? 'line-through text-neutral-500' : ''}`}>
+                        {item.text}
+                      </p>
                       <button
                         onClick={() => handleRemoveInboxItem(item.id)}
-                        className="text-neutral-500 hover:text-red-400 text-xs ml-2"
+                        className="text-neutral-500 hover:text-red-400 text-xs transition-colors"
                       >
                         ✕
                       </button>
                     </div>
                   ))}
                   {inboxItems.length === 0 && (
-                    <p className="text-[11px] text-neutral-500 text-center py-4">Aucune demande pour le moment</p>
+                    <p className="text-[11px] text-neutral-500 text-center py-4">Aucune chose à faire pour le moment</p>
                   )}
                 </div>
               </div>
@@ -368,10 +713,15 @@ function TaskCoachApp() {
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold">📋 Mes tâches</h2>
                   <button
-                    onClick={() => setIsFocusMode(!isFocusMode)}
-                    className="text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-1 transition-colors"
+                    onClick={toggleFocusMode}
+                    disabled={!activeTaskId}
+                    className={`text-xs rounded-lg px-3 py-1 transition-colors ${
+                      activeTaskId
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer'
+                        : 'bg-neutral-700 text-neutral-500 cursor-not-allowed'
+                    }`}
                   >
-                    {isFocusMode ? '🔙 Mode Normal' : '🎯 Mode Focus'}
+                    🎯 Mode Focus
                   </button>
                 </div>
 
@@ -431,7 +781,7 @@ function TaskCoachApp() {
               </div>
 
               {/* Active Task Timer */}
-              {activeTask && (
+              {activeTask && !isFocusMode && (
                 <div className="bg-gradient-to-br from-blue-900/40 to-purple-900/40 border border-blue-700 rounded-2xl p-6">
                   <h2 className="text-lg font-semibold mb-4">⏱️ Tâche active</h2>
 
