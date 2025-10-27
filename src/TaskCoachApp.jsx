@@ -4,41 +4,27 @@ function TaskCoachApp() {
   // ========== STATE MANAGEMENT ==========
   const [activeTab, setActiveTab] = useState('today')
 
-  // Tasks state
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      title: 'Préparer slide "Qualité des données PA"',
-      description: 'Expliquer snapshot, job time, fuseau horaire.',
-      estimateMinutes: 45,
-      status: 'doing',
-      blockNote: '',
-      secondsSpent: 0
-    },
-    {
-      id: 2,
-      title: 'Rédiger notes soutenance',
-      description: 'Structurer les points clés',
-      estimateMinutes: 30,
-      status: 'todo',
-      blockNote: '',
-      secondsSpent: 0
+  // Load data from localStorage on mount
+  const loadFromStorage = (key, defaultValue) => {
+    try {
+      const saved = localStorage.getItem(key)
+      return saved ? JSON.parse(saved) : defaultValue
+    } catch {
+      return defaultValue
     }
-  ])
+  }
+
+  // Tasks state
+  const [tasks, setTasks] = useState(() => loadFromStorage('tasks', []))
 
   // Active task tracking
   const [activeTaskId, setActiveTaskId] = useState(null)
   const [isRunning, setIsRunning] = useState(false)
   const lastTickRef = useRef(Date.now())
 
-  // Daily goals and inbox
-  const [dailyGoals, setDailyGoals] = useState([
-    { id: 1, text: 'Finaliser le dashboard SLA', criteria: 'Toutes les métriques affichées correctement' }
-  ])
-  const [inboxItems, setInboxItems] = useState([])
+  // Inbox
+  const [inboxItems, setInboxItems] = useState(() => loadFromStorage('inboxItems', []))
   const [newInboxItem, setNewInboxItem] = useState('')
-  const [newGoalText, setNewGoalText] = useState('')
-  const [newGoalCriteria, setNewGoalCriteria] = useState('')
 
   // New task form
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -46,12 +32,36 @@ function TaskCoachApp() {
   const [newTaskEstimate, setNewTaskEstimate] = useState(30)
 
   // Daily feedback
-  const [dailyFeedback, setDailyFeedback] = useState('')
-  const [energyLevel, setEnergyLevel] = useState(5)
-  const [satisfactionLevel, setSatisfactionLevel] = useState(5)
+  const [dailyFeedback, setDailyFeedback] = useState(() => loadFromStorage('dailyFeedback', ''))
+  const [energyLevel, setEnergyLevel] = useState(() => loadFromStorage('energyLevel', 5))
+  const [satisfactionLevel, setSatisfactionLevel] = useState(() => loadFromStorage('satisfactionLevel', 5))
 
   // Focus mode
   const [isFocusMode, setIsFocusMode] = useState(false)
+
+  // Drag and drop
+  const [draggedTask, setDraggedTask] = useState(null)
+
+  // ========== PERSISTENCE ==========
+  useEffect(() => {
+    localStorage.setItem('tasks', JSON.stringify(tasks))
+  }, [tasks])
+
+  useEffect(() => {
+    localStorage.setItem('inboxItems', JSON.stringify(inboxItems))
+  }, [inboxItems])
+
+  useEffect(() => {
+    localStorage.setItem('dailyFeedback', dailyFeedback)
+  }, [dailyFeedback])
+
+  useEffect(() => {
+    localStorage.setItem('energyLevel', JSON.stringify(energyLevel))
+  }, [energyLevel])
+
+  useEffect(() => {
+    localStorage.setItem('satisfactionLevel', JSON.stringify(satisfactionLevel))
+  }, [satisfactionLevel])
 
   // ========== TIMER LOGIC ==========
   useEffect(() => {
@@ -135,6 +145,15 @@ function TaskCoachApp() {
     setNewTaskEstimate(30)
   }
 
+  const handleDeleteTask = (taskId, e) => {
+    e.stopPropagation()
+    if (activeTaskId === taskId) {
+      setIsRunning(false)
+      setActiveTaskId(null)
+    }
+    setTasks(tasks.filter(t => t.id !== taskId))
+  }
+
   const handleBlockNoteChange = (e) => {
     const value = e.target.value
     setTasks(prevTasks =>
@@ -144,7 +163,37 @@ function TaskCoachApp() {
     )
   }
 
-  // ========== INBOX & GOALS ==========
+  // ========== DRAG AND DROP ==========
+  const handleDragStart = (e, task) => {
+    setDraggedTask(task)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleDrop = (e, targetTask) => {
+    e.preventDefault()
+    if (!draggedTask || draggedTask.id === targetTask.id) return
+
+    const draggedIndex = tasks.findIndex(t => t.id === draggedTask.id)
+    const targetIndex = tasks.findIndex(t => t.id === targetTask.id)
+
+    const newTasks = [...tasks]
+    newTasks.splice(draggedIndex, 1)
+    newTasks.splice(targetIndex, 0, draggedTask)
+
+    setTasks(newTasks)
+    setDraggedTask(null)
+  }
+
+  const handleDragEnd = () => {
+    setDraggedTask(null)
+  }
+
+  // ========== INBOX ==========
   const handleAddInboxItem = (e) => {
     e.preventDefault()
     if (!newInboxItem.trim()) return
@@ -155,19 +204,6 @@ function TaskCoachApp() {
 
   const handleRemoveInboxItem = (id) => {
     setInboxItems(inboxItems.filter(item => item.id !== id))
-  }
-
-  const handleAddGoal = (e) => {
-    e.preventDefault()
-    if (!newGoalText.trim()) return
-
-    setDailyGoals([...dailyGoals, { id: Date.now(), text: newGoalText, criteria: newGoalCriteria }])
-    setNewGoalText('')
-    setNewGoalCriteria('')
-  }
-
-  const handleRemoveGoal = (id) => {
-    setDailyGoals(dailyGoals.filter(goal => goal.id !== id))
   }
 
   // ========== KPI CALCULATIONS ==========
@@ -201,6 +237,9 @@ function TaskCoachApp() {
   }
 
   const activeTask = tasks.find(t => t.id === activeTaskId)
+
+  // Time options in 15 min increments
+  const timeOptions = [15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240]
 
   // ========== RENDER ==========
   return (
@@ -238,53 +277,6 @@ function TaskCoachApp() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* ========== COLUMN A: PLANIFIER ========== */}
             <div className="space-y-6">
-              {/* Daily Goals */}
-              <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6">
-                <h2 className="text-lg font-semibold mb-4">🎯 Objectifs du jour</h2>
-
-                <form onSubmit={handleAddGoal} className="mb-4 space-y-2">
-                  <input
-                    type="text"
-                    value={newGoalText}
-                    onChange={(e) => setNewGoalText(e.target.value)}
-                    placeholder="Nouvel objectif..."
-                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <input
-                    type="text"
-                    value={newGoalCriteria}
-                    onChange={(e) => setNewGoalCriteria(e.target.value)}
-                    placeholder="Critère de succès..."
-                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button
-                    type="submit"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-                  >
-                    + Ajouter
-                  </button>
-                </form>
-
-                <div className="space-y-2">
-                  {dailyGoals.map(goal => (
-                    <div key={goal.id} className="bg-neutral-900 border border-neutral-800 rounded-lg p-3">
-                      <div className="flex justify-between items-start mb-1">
-                        <p className="text-sm font-medium">{goal.text}</p>
-                        <button
-                          onClick={() => handleRemoveGoal(goal.id)}
-                          className="text-neutral-500 hover:text-red-400 text-xs"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      {goal.criteria && (
-                        <p className="text-[11px] text-neutral-500">→ {goal.criteria}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* Inbox */}
               <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6">
                 <h2 className="text-lg font-semibold mb-4">📥 Inbox rapide</h2>
@@ -325,10 +317,7 @@ function TaskCoachApp() {
                   )}
                 </div>
               </div>
-            </div>
 
-            {/* ========== COLUMN B: EXÉCUTER ========== */}
-            <div className="space-y-6">
               {/* Add New Task */}
               <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6">
                 <h2 className="text-lg font-semibold mb-4">➕ Nouvelle tâche</h2>
@@ -350,14 +339,17 @@ function TaskCoachApp() {
                     className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <div className="flex gap-3">
-                    <input
-                      type="number"
+                    <select
                       value={newTaskEstimate}
                       onChange={(e) => setNewTaskEstimate(e.target.value)}
-                      placeholder="Estimation (min)"
-                      min="1"
-                      className="w-32 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                      className="w-32 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {timeOptions.map(time => (
+                        <option key={time} value={time}>
+                          {time} min
+                        </option>
+                      ))}
+                    </select>
                     <button
                       type="submit"
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
@@ -367,7 +359,10 @@ function TaskCoachApp() {
                   </div>
                 </form>
               </div>
+            </div>
 
+            {/* ========== COLUMN B: EXÉCUTER ========== */}
+            <div className="space-y-6">
               {/* Task List */}
               <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6">
                 <div className="flex justify-between items-center mb-4">
@@ -381,35 +376,57 @@ function TaskCoachApp() {
                 </div>
 
                 <div className="space-y-2">
-                  {tasks.map(task => (
-                    <div
-                      key={task.id}
-                      onClick={() => task.status !== 'done' && handleTaskClick(task.id)}
-                      className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                        task.id === activeTaskId
-                          ? 'bg-blue-900/30 border-blue-600'
-                          : task.status === 'done'
-                          ? 'bg-green-900/20 border-green-800/50 opacity-60'
-                          : 'bg-neutral-900 border-neutral-800 hover:border-neutral-700'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="text-sm font-semibold">{task.title}</h3>
-                        <span className={`text-[10px] px-2 py-1 rounded ${
-                          task.status === 'todo' ? 'bg-neutral-700 text-neutral-300' :
-                          task.status === 'doing' ? 'bg-blue-700 text-blue-200' :
-                          'bg-green-700 text-green-200'
-                        }`}>
-                          {task.status === 'todo' ? 'À faire' : task.status === 'doing' ? 'En cours' : 'Terminé'}
-                        </span>
+                  {tasks.length === 0 ? (
+                    <p className="text-[11px] text-neutral-500 text-center py-8">
+                      Aucune tâche. Créez-en une pour commencer !
+                    </p>
+                  ) : (
+                    tasks.map(task => (
+                      <div
+                        key={task.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, task)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, task)}
+                        onDragEnd={handleDragEnd}
+                        onClick={() => task.status !== 'done' && handleTaskClick(task.id)}
+                        className={`border rounded-lg p-4 cursor-move transition-all ${
+                          task.id === activeTaskId
+                            ? 'bg-blue-900/30 border-blue-600'
+                            : task.status === 'done'
+                            ? 'bg-green-900/20 border-green-800/50 opacity-60'
+                            : 'bg-neutral-900 border-neutral-800 hover:border-neutral-700'
+                        } ${draggedTask?.id === task.id ? 'opacity-50' : ''}`}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center gap-2 flex-1">
+                            <span className="text-neutral-600 text-xs cursor-grab">⋮⋮</span>
+                            <h3 className="text-sm font-semibold flex-1">{task.title}</h3>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] px-2 py-1 rounded ${
+                              task.status === 'todo' ? 'bg-neutral-700 text-neutral-300' :
+                              task.status === 'doing' ? 'bg-blue-700 text-blue-200' :
+                              'bg-green-700 text-green-200'
+                            }`}>
+                              {task.status === 'todo' ? 'À faire' : task.status === 'doing' ? 'En cours' : 'Terminé'}
+                            </span>
+                            <button
+                              onClick={(e) => handleDeleteTask(task.id, e)}
+                              className="text-neutral-500 hover:text-red-400 text-sm transition-colors"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-neutral-400 mb-2">{task.description}</p>
+                        <div className="flex justify-between items-center text-[11px] text-neutral-500">
+                          <span>⏱️ Estimé: {task.estimateMinutes}min</span>
+                          <span>⏲️ Réel: {Math.floor(task.secondsSpent / 60)}min</span>
+                        </div>
                       </div>
-                      <p className="text-[11px] text-neutral-400 mb-2">{task.description}</p>
-                      <div className="flex justify-between items-center text-[11px] text-neutral-500">
-                        <span>⏱️ Estimé: {task.estimateMinutes}min</span>
-                        <span>⏲️ Réel: {Math.floor(task.secondsSpent / 60)}min</span>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
 
