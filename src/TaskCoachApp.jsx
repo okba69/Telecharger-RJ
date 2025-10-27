@@ -38,6 +38,8 @@ function TaskCoachApp() {
 
   // Focus mode & Pomodoro
   const [isFocusMode, setIsFocusMode] = useState(false)
+  const [isLaunching, setIsLaunching] = useState(false)
+  const [showConfetti, setShowConfetti] = useState(false)
   const [pomodoroMode, setPomodoroMode] = useState('work') // 'work' | 'break'
   const [pomodoroSeconds, setPomodoroSeconds] = useState(25 * 60) // 25 minutes
   const [isPomodoroRunning, setIsPomodoroRunning] = useState(false)
@@ -51,6 +53,8 @@ function TaskCoachApp() {
 
   // Audio
   const audioContextRef = useRef(null)
+  const ambientOscillatorRef = useRef(null)
+  const ambientGainNodeRef = useRef(null)
 
   // Motivational messages
   const motivationalMessages = [
@@ -190,6 +194,61 @@ function TaskCoachApp() {
     }
   }
 
+  const playAmbientMusic = () => {
+    try {
+      if (ambientOscillatorRef.current) return // Already playing
+
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+
+      // Create two oscillators for a richer ambient sound
+      const osc1 = audioContext.createOscillator()
+      const osc2 = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+
+      osc1.connect(gainNode)
+      osc2.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+
+      // Gentle frequencies (C and G notes in lower octave)
+      osc1.frequency.value = 130.81 // C3
+      osc2.frequency.value = 196.00 // G3
+      osc1.type = 'sine'
+      osc2.type = 'sine'
+
+      // Very quiet volume
+      gainNode.gain.setValueAtTime(0.03, audioContext.currentTime)
+
+      osc1.start()
+      osc2.start()
+
+      // Store refs for cleanup
+      ambientOscillatorRef.current = [osc1, osc2, audioContext]
+      ambientGainNodeRef.current = gainNode
+    } catch (error) {
+      console.log('Ambient audio not supported')
+    }
+  }
+
+  const stopAmbientMusic = () => {
+    if (ambientOscillatorRef.current) {
+      const [osc1, osc2, audioContext] = ambientOscillatorRef.current
+      try {
+        osc1.stop()
+        osc2.stop()
+        audioContext.close()
+      } catch (error) {
+        console.log('Error stopping ambient music')
+      }
+      ambientOscillatorRef.current = null
+      ambientGainNodeRef.current = null
+    }
+  }
+
+  const triggerConfetti = () => {
+    setShowConfetti(true)
+    setTimeout(() => setShowConfetti(false), 3000)
+  }
+
   // ========== TASK ACTIONS ==========
   const handleTaskClick = (taskId) => {
     const task = tasks.find(t => t.id === taskId)
@@ -210,11 +269,25 @@ function TaskCoachApp() {
 
   const handlePause = () => {
     setIsRunning(false)
+    if (activeTaskId) {
+      setTasks(prevTasks =>
+        prevTasks.map(t =>
+          t.id === activeTaskId ? { ...t, status: 'paused' } : t
+        )
+      )
+    }
   }
 
   const handleResume = () => {
     setIsRunning(true)
     lastTickRef.current = Date.now()
+    if (activeTaskId) {
+      setTasks(prevTasks =>
+        prevTasks.map(t =>
+          t.id === activeTaskId ? { ...t, status: 'doing' } : t
+        )
+      )
+    }
   }
 
   const handleComplete = () => {
@@ -227,6 +300,8 @@ function TaskCoachApp() {
     )
     setIsRunning(false)
     setActiveTaskId(null)
+    triggerConfetti()
+    playNotificationSound()
   }
 
   const handleReactivateTask = (taskId, e) => {
@@ -353,18 +428,26 @@ function TaskCoachApp() {
   // ========== FOCUS MODE ==========
   const toggleFocusMode = () => {
     if (!isFocusMode && activeTaskId) {
-      // Starting focus mode
-      setIsFocusMode(true)
-      setPomodoroMode('work')
-      setPomodoroSeconds(25 * 60)
-      setIsPomodoroRunning(true)
-      pomodoroTickRef.current = Date.now()
-      const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
-      setMotivationalMessage(randomMsg)
+      // Starting focus mode - show rocket animation first
+      setIsLaunching(true)
+
+      // After rocket animation (1.5s), show fullscreen focus mode
+      setTimeout(() => {
+        setIsLaunching(false)
+        setIsFocusMode(true)
+        setPomodoroMode('work')
+        setPomodoroSeconds(25 * 60)
+        setIsPomodoroRunning(true)
+        pomodoroTickRef.current = Date.now()
+        const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
+        setMotivationalMessage(randomMsg)
+        playAmbientMusic()
+      }, 1500)
     } else {
       // Stopping focus mode
       setIsFocusMode(false)
       setIsPomodoroRunning(false)
+      stopAmbientMusic()
     }
   }
 
@@ -612,9 +695,13 @@ function TaskCoachApp() {
                             <span className={`text-[10px] px-2 py-1 rounded ${
                               task.status === 'todo' ? 'bg-neutral-700 text-neutral-300' :
                               task.status === 'doing' ? 'bg-blue-700 text-blue-200' :
+                              task.status === 'paused' ? 'bg-yellow-700 text-yellow-200' :
                               'bg-green-700 text-green-200'
                             }`}>
-                              {task.status === 'todo' ? 'À faire' : task.status === 'doing' ? 'En cours' : 'Terminé'}
+                              {task.status === 'todo' ? 'À faire' :
+                               task.status === 'doing' ? 'En cours' :
+                               task.status === 'paused' ? 'En pause' :
+                               'Terminé'}
                             </span>
                             {task.status === 'done' && (
                               <button
@@ -938,6 +1025,156 @@ function TaskCoachApp() {
           </div>
         )}
       </main>
+
+      {/* Rocket Launch Animation */}
+      {isLaunching && (
+        <div className="rocket-overlay">
+          <div className="rocket">🚀</div>
+        </div>
+      )}
+
+      {/* Fullscreen Focus Mode */}
+      {isFocusMode && (
+        <div className="fixed inset-0 z-50 bg-gradient-to-br from-indigo-950 via-purple-950 to-pink-950 flex items-center justify-center p-8 animate-fade-in">
+          {/* Background stars */}
+          <div className="absolute inset-0 overflow-hidden">
+            {[...Array(20)].map((_, i) => (
+              <div
+                key={i}
+                className="star"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  width: `${2 + Math.random() * 4}px`,
+                  height: `${2 + Math.random() * 4}px`,
+                  animationDelay: `${Math.random() * 2}s`,
+                  animationDuration: `${2 + Math.random() * 2}s`
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Close button */}
+          <button
+            onClick={toggleFocusMode}
+            className="absolute top-8 right-8 text-white/60 hover:text-white text-2xl transition-colors z-10"
+          >
+            ✕
+          </button>
+
+          {/* Main content */}
+          <div className="relative max-w-2xl w-full">
+            {/* Task info */}
+            <div className="text-center mb-8 focus-fade-in">
+              <h2 className="text-3xl font-bold mb-3 text-white">{activeTask?.title}</h2>
+              <p className="text-lg text-purple-200">{activeTask?.description}</p>
+            </div>
+
+            {/* Circular Progress with Timer */}
+            <div className="flex justify-center mb-8 focus-zoom-in">
+              <div className="relative">
+                {/* SVG Circular Progress */}
+                <svg width="280" height="280" className="transform -rotate-90">
+                  {/* Background circle */}
+                  <circle
+                    cx="140"
+                    cy="140"
+                    r="120"
+                    stroke="rgba(255, 255, 255, 0.1)"
+                    strokeWidth="12"
+                    fill="none"
+                  />
+                  {/* Progress circle */}
+                  <circle
+                    cx="140"
+                    cy="140"
+                    r="120"
+                    stroke="url(#gradient)"
+                    strokeWidth="12"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeDasharray={754}
+                    strokeDashoffset={754 * (1 - (pomodoroMode === 'work' ? (25 * 60 - pomodoroSeconds) / (25 * 60) : (5 * 60 - pomodoroSeconds) / (5 * 60)))}
+                    className="transition-all duration-1000"
+                  />
+                  <defs>
+                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#a855f7" />
+                      <stop offset="100%" stopColor="#ec4899" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+
+                {/* Timer in center */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <div className="text-7xl font-bold font-mono text-white mb-2">
+                    {formatPomodoroTime(pomodoroSeconds)}
+                  </div>
+                  <div className="text-sm text-purple-300 uppercase tracking-wider">
+                    {pomodoroMode === 'work' ? '🎯 Focus Session' : '☕ Break Time'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div className="flex justify-center gap-4 mb-8 focus-fade-in">
+              <button
+                onClick={handlePomodoroToggle}
+                className="px-8 py-4 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-2xl text-white font-semibold text-lg transition-all transform hover:scale-105"
+              >
+                {isPomodoroRunning ? '⏸️ Pause' : '▶️ Start'}
+              </button>
+              <button
+                onClick={handlePomodoroReset}
+                className="px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-2xl text-white font-semibold text-lg transition-all transform hover:scale-105"
+              >
+                🔄 Reset
+              </button>
+            </div>
+
+            {/* Motivational Message */}
+            {motivationalMessage && (
+              <div className="text-center breathe">
+                <div className="inline-block bg-gradient-to-r from-yellow-400/30 to-orange-400/30 backdrop-blur-sm rounded-2xl px-8 py-4 border border-yellow-400/30">
+                  <p className="text-xl font-semibold text-white">{motivationalMessage}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Stats */}
+            <div className="mt-8 flex justify-center gap-6 text-center focus-fade-in">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl px-6 py-3">
+                <div className="text-2xl font-bold text-white">🍅 {pomodoroCount}</div>
+                <div className="text-xs text-purple-300">Pomodoros</div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl px-6 py-3">
+                <div className="text-2xl font-bold text-white">{formatTime(activeTask?.secondsSpent || 0)}</div>
+                <div className="text-xs text-purple-300">Total Time</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confetti */}
+      {showConfetti && (
+        <>
+          {[...Array(50)].map((_, i) => (
+            <div
+              key={i}
+              className="confetti-piece"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `-10px`,
+                backgroundColor: ['#f59e0b', '#8b5cf6', '#ec4899', '#10b981', '#3b82f6'][Math.floor(Math.random() * 5)],
+                animationDelay: `${Math.random() * 0.5}s`,
+                animationDuration: `${2 + Math.random()}s`
+              }}
+            />
+          ))}
+        </>
+      )}
     </div>
   )
 }
