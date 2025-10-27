@@ -169,7 +169,7 @@ function TaskCoachApp() {
   // ========== AUDIO ==========
   const playNotificationSound = () => {
     try {
-      // Create a simple beep sound using Web Audio API
+      // Very gentle notification sound
       const audioContext = new (window.AudioContext || window.webkitAudioContext)()
       const oscillator = audioContext.createOscillator()
       const gainNode = audioContext.createGain()
@@ -177,49 +177,14 @@ function TaskCoachApp() {
       oscillator.connect(gainNode)
       gainNode.connect(audioContext.destination)
 
-      oscillator.frequency.value = 800
+      oscillator.frequency.value = 600 // Softer frequency
       oscillator.type = 'sine'
 
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
+      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime) // Much quieter
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
 
       oscillator.start(audioContext.currentTime)
-      oscillator.stop(audioContext.currentTime + 0.5)
-    } catch (error) {
-      console.log('Audio not supported')
-    }
-  }
-
-  const playBackgroundMusic = () => {
-    // Simple ambient sound using Web Audio API
-    try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
-      }
-
-      const audioContext = audioContextRef.current
-      const oscillator1 = audioContext.createOscillator()
-      const oscillator2 = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
-
-      oscillator1.connect(gainNode)
-      oscillator2.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-
-      oscillator1.frequency.value = 432 // Relaxing frequency
-      oscillator2.frequency.value = 528 // Healing frequency
-      oscillator1.type = 'sine'
-      oscillator2.type = 'sine'
-
-      gainNode.gain.setValueAtTime(0.05, audioContext.currentTime)
-
-      oscillator1.start()
-      oscillator2.start()
-
-      return () => {
-        oscillator1.stop()
-        oscillator2.stop()
-      }
+      oscillator.stop(audioContext.currentTime + 0.3)
     } catch (error) {
       console.log('Audio not supported')
     }
@@ -262,6 +227,15 @@ function TaskCoachApp() {
     )
     setIsRunning(false)
     setActiveTaskId(null)
+  }
+
+  const handleReactivateTask = (taskId, e) => {
+    e.stopPropagation()
+    setTasks(prevTasks =>
+      prevTasks.map(t =>
+        t.id === taskId ? { ...t, status: 'todo' } : t
+      )
+    )
   }
 
   const handleAddTask = (e) => {
@@ -387,17 +361,10 @@ function TaskCoachApp() {
       pomodoroTickRef.current = Date.now()
       const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
       setMotivationalMessage(randomMsg)
-      // Start background music (optional)
-      const stopMusic = playBackgroundMusic()
-      return stopMusic
     } else {
       // Stopping focus mode
       setIsFocusMode(false)
       setIsPomodoroRunning(false)
-      if (audioContextRef.current) {
-        audioContextRef.current.close()
-        audioContextRef.current = null
-      }
     }
   }
 
@@ -455,119 +422,7 @@ function TaskCoachApp() {
   // Time options in 15 min increments
   const timeOptions = [15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240]
 
-  // ========== FOCUS MODE FULL SCREEN ==========
-  if (isFocusMode && activeTask) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 text-white flex items-center justify-center p-6">
-        <div className="max-w-4xl w-full">
-          {/* Exit Focus Mode */}
-          <div className="text-right mb-6">
-            <button
-              onClick={toggleFocusMode}
-              className="text-sm text-white/60 hover:text-white transition-colors"
-            >
-              ✕ Quitter le mode focus
-            </button>
-          </div>
-
-          {/* Pomodoro Timer */}
-          <div className="text-center mb-12">
-            <div className="inline-block bg-black/30 backdrop-blur-lg rounded-3xl p-8 mb-6">
-              <div className="text-sm text-white/60 mb-2 uppercase tracking-wider">
-                {pomodoroMode === 'work' ? '🎯 Travail Focus' : '☕ Pause'}
-              </div>
-              <div className="text-8xl font-bold font-mono mb-4">
-                {formatPomodoroTime(pomodoroSeconds)}
-              </div>
-              <div className="flex gap-4 justify-center">
-                <button
-                  onClick={handlePomodoroToggle}
-                  className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-xl font-medium transition-colors"
-                >
-                  {isPomodoroRunning ? '⏸️ Pause' : '▶️ Démarrer'}
-                </button>
-                <button
-                  onClick={handlePomodoroReset}
-                  className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-medium transition-colors"
-                >
-                  🔄 Reset
-                </button>
-              </div>
-            </div>
-
-            {/* Pomodoro Count */}
-            <div className="text-white/60 text-sm">
-              🍅 Pomodoros complétés aujourd'hui : {pomodoroCount}
-            </div>
-          </div>
-
-          {/* Task Info */}
-          <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 mb-8">
-            <h1 className="text-4xl font-bold mb-4">{activeTask.title}</h1>
-            <p className="text-xl text-white/80 mb-6">{activeTask.description}</p>
-
-            <div className="flex justify-between items-center text-sm">
-              <div>
-                <span className="text-white/60">Estimé:</span>
-                <span className="ml-2 font-semibold">{activeTask.estimateMinutes} min</span>
-              </div>
-              <div>
-                <span className="text-white/60">Temps réel:</span>
-                <span className="ml-2 font-semibold">{formatTime(activeTask.secondsSpent)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Motivational Message */}
-          {motivationalMessage && (
-            <div className="text-center mb-8 animate-pulse">
-              <div className="inline-block bg-gradient-to-r from-yellow-400/20 to-orange-400/20 backdrop-blur-lg rounded-2xl px-8 py-4">
-                <p className="text-2xl font-semibold">{motivationalMessage}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Task Controls */}
-          <div className="flex gap-4 justify-center">
-            {isRunning ? (
-              <button
-                onClick={handlePause}
-                className="px-8 py-4 bg-yellow-500 hover:bg-yellow-600 rounded-xl font-semibold text-lg transition-colors"
-              >
-                ⏸️ Pause Tâche
-              </button>
-            ) : (
-              <button
-                onClick={handleResume}
-                className="px-8 py-4 bg-green-500 hover:bg-green-600 rounded-xl font-semibold text-lg transition-colors"
-              >
-                ▶️ Reprendre Tâche
-              </button>
-            )}
-            <button
-              onClick={handleComplete}
-              className="px-8 py-4 bg-emerald-500 hover:bg-emerald-600 rounded-xl font-semibold text-lg transition-colors"
-            >
-              ✅ Terminer
-            </button>
-          </div>
-
-          {/* Block Note in Focus Mode */}
-          <div className="mt-8">
-            <textarea
-              value={activeTask.blockNote}
-              onChange={handleBlockNoteChange}
-              placeholder="Notes ou blocages..."
-              rows="3"
-              className="w-full bg-white/10 backdrop-blur-lg border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/40"
-            />
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ========== NORMAL VIEW ==========
+  // ========== RENDER ==========
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-neutral-200">
       {/* Header */}
@@ -761,6 +616,15 @@ function TaskCoachApp() {
                             }`}>
                               {task.status === 'todo' ? 'À faire' : task.status === 'doing' ? 'En cours' : 'Terminé'}
                             </span>
+                            {task.status === 'done' && (
+                              <button
+                                onClick={(e) => handleReactivateTask(task.id, e)}
+                                className="text-neutral-500 hover:text-blue-400 text-sm transition-colors"
+                                title="Réactiver la tâche"
+                              >
+                                🔄
+                              </button>
+                            )}
                             <button
                               onClick={(e) => handleDeleteTask(task.id, e)}
                               className="text-neutral-500 hover:text-red-400 text-sm transition-colors"
@@ -781,9 +645,63 @@ function TaskCoachApp() {
               </div>
 
               {/* Active Task Timer */}
-              {activeTask && !isFocusMode && (
-                <div className="bg-gradient-to-br from-blue-900/40 to-purple-900/40 border border-blue-700 rounded-2xl p-6">
-                  <h2 className="text-lg font-semibold mb-4">⏱️ Tâche active</h2>
+              {activeTask && (
+                <div className={`rounded-2xl p-6 transition-all duration-500 ${
+                  isFocusMode
+                    ? 'bg-gradient-to-br from-indigo-900/60 via-purple-900/60 to-pink-900/60 border-2 border-purple-500 shadow-2xl shadow-purple-500/20 scale-105'
+                    : 'bg-gradient-to-br from-blue-900/40 to-purple-900/40 border border-blue-700'
+                }`}>
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-semibold">
+                      {isFocusMode ? '🎯 Mode Focus' : '⏱️ Tâche active'}
+                    </h2>
+                    {isFocusMode && (
+                      <button
+                        onClick={toggleFocusMode}
+                        className="text-xs text-neutral-400 hover:text-neutral-200 transition-colors"
+                      >
+                        ✕ Quitter
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Pomodoro Timer (only in focus mode) */}
+                  {isFocusMode && (
+                    <div className="bg-black/30 rounded-xl p-4 mb-4 text-center animate-fade-in">
+                      <div className="text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">
+                        {pomodoroMode === 'work' ? '🎯 Travail Focus' : '☕ Pause'}
+                      </div>
+                      <div className="text-6xl font-bold font-mono mb-2">
+                        {formatPomodoroTime(pomodoroSeconds)}
+                      </div>
+                      <div className="text-[10px] text-neutral-500 mb-3">
+                        🍅 Pomodoros: {pomodoroCount}
+                      </div>
+                      <div className="flex gap-2 justify-center">
+                        <button
+                          onClick={handlePomodoroToggle}
+                          className="px-4 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          {isPomodoroRunning ? '⏸️ Pause' : '▶️ Démarrer'}
+                        </button>
+                        <button
+                          onClick={handlePomodoroReset}
+                          className="px-4 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition-colors"
+                        >
+                          🔄 Reset
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Motivational Message (only in focus mode) */}
+                  {isFocusMode && motivationalMessage && (
+                    <div className="mb-4 text-center animate-pulse">
+                      <div className="bg-gradient-to-r from-yellow-400/20 to-orange-400/20 rounded-lg px-4 py-2">
+                        <p className="text-sm font-semibold">{motivationalMessage}</p>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="mb-4">
                     <h3 className="text-xl font-bold mb-2">{activeTask.title}</h3>
