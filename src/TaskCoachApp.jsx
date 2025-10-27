@@ -733,7 +733,11 @@ function TaskCoachApp() {
     hover: 'hover:bg-gray-100',
     input: 'bg-gray-100 border-gray-300 text-gray-900 placeholder-gray-500',
     card: 'bg-white border-gray-200',
-    header: 'bg-white border-gray-200'
+    header: 'bg-white border-gray-200',
+    taskCard: 'bg-gray-50 border-gray-200 hover:border-gray-300',
+    taskCardActive: 'bg-blue-50 border-blue-300',
+    taskCardDone: 'bg-green-50 border-green-200',
+    inboxItem: 'bg-gray-100 border-gray-200'
   } : {
     bg: 'bg-[#0a0a0a]',
     bgSecondary: 'bg-[#111]',
@@ -745,7 +749,11 @@ function TaskCoachApp() {
     hover: 'hover:bg-neutral-800',
     input: 'bg-neutral-900 border-neutral-700 text-neutral-200 placeholder-neutral-500',
     card: 'bg-[#111] border-neutral-800',
-    header: 'bg-[#111] border-neutral-800'
+    header: 'bg-[#111] border-neutral-800',
+    taskCard: 'bg-neutral-900 border-neutral-800 hover:border-neutral-700',
+    taskCardActive: 'bg-blue-900/30 border-blue-600',
+    taskCardDone: 'bg-green-900/20 border-green-800/50',
+    inboxItem: 'bg-neutral-900 border-neutral-800'
   }
 
   // ========== RENDER ==========
@@ -816,30 +824,30 @@ function TaskCoachApp() {
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleInboxDrop(e, item)}
                       onDragEnd={handleInboxDragEnd}
-                      className={`bg-neutral-900 border border-neutral-800 rounded-lg p-3 flex items-center gap-3 cursor-move transition-all ${
+                      className={`${themeClasses.inboxItem} border rounded-lg p-3 flex items-center gap-3 cursor-move transition-all ${
                         draggedInboxItem?.id === item.id ? 'opacity-50' : ''
                       }`}
                     >
-                      <span className="text-neutral-600 text-xs cursor-grab">⋮⋮</span>
+                      <span className={`${themeClasses.textMuted} text-xs cursor-grab`}>⋮⋮</span>
                       <input
                         type="checkbox"
                         checked={item.completed}
                         onChange={() => handleToggleInboxItem(item.id)}
-                        className="w-4 h-4 rounded border-neutral-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                        className={`w-4 h-4 rounded ${theme === 'light' ? 'border-gray-400' : 'border-neutral-600'} text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer`}
                       />
-                      <p className={`text-sm flex-1 ${item.completed ? 'line-through text-neutral-500' : ''}`}>
+                      <p className={`text-sm flex-1 ${item.completed ? `line-through ${themeClasses.textMuted}` : ''}`}>
                         {item.text}
                       </p>
                       <button
                         onClick={() => handleRemoveInboxItem(item.id)}
-                        className="text-neutral-500 hover:text-red-400 text-xs transition-colors"
+                        className={`${themeClasses.textMuted} hover:text-red-400 text-xs transition-colors`}
                       >
                         ✕
                       </button>
                     </div>
                   ))}
                   {inboxItems.length === 0 && (
-                    <p className="text-[11px] text-neutral-500 text-center py-4">Aucune chose à faire pour le moment</p>
+                    <p className={`text-[11px] ${themeClasses.textMuted} text-center py-4`}>Aucune chose à faire pour le moment</p>
                   )}
                 </div>
               </div>
@@ -919,6 +927,8 @@ function TaskCoachApp() {
                     className={`text-xs rounded-lg px-3 py-1 transition-colors ${
                       activeTaskId
                         ? 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer'
+                        : theme === 'light'
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         : 'bg-neutral-700 text-neutral-500 cursor-not-allowed'
                     }`}
                   >
@@ -928,7 +938,7 @@ function TaskCoachApp() {
 
                 <div className="space-y-2">
                   {tasks.length === 0 ? (
-                    <p className="text-[11px] text-neutral-500 text-center py-8">
+                    <p className={`text-[11px] ${themeClasses.textMuted} text-center py-8`}>
                       Aucune tâche. Créez-en une pour commencer !
                     </p>
                   ) : (
@@ -943,20 +953,20 @@ function TaskCoachApp() {
                         onClick={() => task.status !== 'done' && handleTaskClick(task.id)}
                         className={`border rounded-lg p-4 cursor-move transition-all ${
                           task.id === activeTaskId
-                            ? 'bg-blue-900/30 border-blue-600'
+                            ? themeClasses.taskCardActive
                             : task.status === 'done'
-                            ? 'bg-green-900/20 border-green-800/50 opacity-60'
-                            : 'bg-neutral-900 border-neutral-800 hover:border-neutral-700'
+                            ? `${themeClasses.taskCardDone} opacity-60`
+                            : themeClasses.taskCard
                         } ${draggedTask?.id === task.id ? 'opacity-50' : ''}`}
                       >
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex items-center gap-2 flex-1">
-                            <span className="text-neutral-600 text-xs cursor-grab">⋮⋮</span>
+                            <span className={`${themeClasses.textMuted} text-xs cursor-grab`}>⋮⋮</span>
                             <h3 className="text-sm font-semibold flex-1">{task.title}</h3>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className={`text-[10px] px-2 py-1 rounded ${
-                              task.status === 'todo' ? 'bg-neutral-700 text-neutral-300' :
+                              task.status === 'todo' ? (theme === 'light' ? 'bg-gray-300 text-gray-700' : 'bg-neutral-700 text-neutral-300') :
                               task.status === 'doing' ? 'bg-blue-700 text-blue-200' :
                               task.status === 'paused' ? 'bg-yellow-700 text-yellow-200' :
                               'bg-green-700 text-green-200'
@@ -969,7 +979,7 @@ function TaskCoachApp() {
                             {task.status === 'done' && (
                               <button
                                 onClick={(e) => handleReactivateTask(task.id, e)}
-                                className="text-neutral-500 hover:text-blue-400 text-sm transition-colors"
+                                className={`${themeClasses.textMuted} hover:text-blue-400 text-sm transition-colors`}
                                 title="Réactiver la tâche"
                               >
                                 🔄
@@ -977,14 +987,14 @@ function TaskCoachApp() {
                             )}
                             <button
                               onClick={(e) => handleDeleteTask(task.id, e)}
-                              className="text-neutral-500 hover:text-red-400 text-sm transition-colors"
+                              className={`${themeClasses.textMuted} hover:text-red-400 text-sm transition-colors`}
                             >
                               🗑️
                             </button>
                           </div>
                         </div>
-                        <p className="text-[11px] text-neutral-400 mb-2">{task.description}</p>
-                        <div className="flex justify-between items-center text-[11px] text-neutral-500">
+                        <p className={`text-[11px] ${themeClasses.textSecondary} mb-2`}>{task.description}</p>
+                        <div className={`flex justify-between items-center text-[11px] ${themeClasses.textMuted}`}>
                           <span>⏱️ Estimé: {task.estimateMinutes}min</span>
                           <span>⏲️ Réel: {Math.floor(task.secondsSpent / 60)}min</span>
                         </div>
@@ -1107,16 +1117,16 @@ function TaskCoachApp() {
                       onChange={handleBlockNoteChange}
                       placeholder="Décrivez le problème rencontré..."
                       rows="3"
-                      className="w-full bg-neutral-900/50 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      className={`w-full ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500`}
                     />
                   </div>
                 </div>
               )}
 
               {!activeTask && (
-                <div className="bg-[#111] border border-neutral-800 rounded-2xl p-8 text-center">
-                  <p className="text-neutral-500 mb-2">Aucune tâche active</p>
-                  <p className="text-[11px] text-neutral-600">Cliquez sur une tâche pour démarrer le chrono</p>
+                <div className={`${themeClasses.card} border rounded-2xl p-8 text-center`}>
+                  <p className={`${themeClasses.textMuted} mb-2`}>Aucune tâche active</p>
+                  <p className={`text-[11px] ${themeClasses.textMuted}`}>Cliquez sur une tâche pour démarrer le chrono</p>
                 </div>
               )}
             </div>
@@ -1136,30 +1146,30 @@ function TaskCoachApp() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-800 rounded-xl p-4">
+                  <div className={`bg-gradient-to-br ${theme === 'light' ? 'from-green-100 to-green-50 border-green-300' : 'from-green-900/30 to-green-800/20 border-green-800'} border rounded-xl p-4`}>
                     <div className="text-3xl font-bold mb-1">{completedTasks.length}</div>
-                    <div className="text-[11px] text-neutral-400">Tâches terminées</div>
+                    <div className={`text-[11px] ${themeClasses.textSecondary}`}>Tâches terminées</div>
                   </div>
 
-                  <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-800 rounded-xl p-4">
+                  <div className={`bg-gradient-to-br ${theme === 'light' ? 'from-blue-100 to-blue-50 border-blue-300' : 'from-blue-900/30 to-blue-800/20 border-blue-800'} border rounded-xl p-4`}>
                     <div className="text-3xl font-bold mb-1">
                       {totalProductiveHours}h{totalProductiveMinutes.toString().padStart(2, '0')}
                     </div>
-                    <div className="text-[11px] text-neutral-400">Temps productif</div>
+                    <div className={`text-[11px] ${themeClasses.textSecondary}`}>Temps productif</div>
                   </div>
 
-                  <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 border border-purple-800 rounded-xl p-4">
+                  <div className={`bg-gradient-to-br ${theme === 'light' ? 'from-purple-100 to-purple-50 border-purple-300' : 'from-purple-900/30 to-purple-800/20 border-purple-800'} border rounded-xl p-4`}>
                     <div className={`text-3xl font-bold mb-1 ${
                       averageDeviation > 0 ? 'text-orange-400' : 'text-green-400'
                     }`}>
                       {averageDeviation > 0 ? '+' : ''}{averageDeviation}%
                     </div>
-                    <div className="text-[11px] text-neutral-400">Écart moyen Est/Réel</div>
+                    <div className={`text-[11px] ${themeClasses.textSecondary}`}>Écart moyen Est/Réel</div>
                   </div>
 
-                  <div className="bg-gradient-to-br from-orange-900/30 to-orange-800/20 border border-orange-800 rounded-xl p-4">
+                  <div className={`bg-gradient-to-br ${theme === 'light' ? 'from-orange-100 to-orange-50 border-orange-300' : 'from-orange-900/30 to-orange-800/20 border-orange-800'} border rounded-xl p-4`}>
                     <div className="text-3xl font-bold mb-1">{blockages.length}</div>
-                    <div className="text-[11px] text-neutral-400">Blocages</div>
+                    <div className={`text-[11px] ${themeClasses.textSecondary}`}>Blocages</div>
                   </div>
                 </div>
 
@@ -1169,9 +1179,9 @@ function TaskCoachApp() {
                     <h3 className="text-sm font-semibold mb-2">⚠️ Blocages du jour</h3>
                     <div className="space-y-2">
                       {blockages.map(task => (
-                        <div key={task.id} className="bg-orange-900/20 border border-orange-800/50 rounded-lg p-3">
+                        <div key={task.id} className={`${theme === 'light' ? 'bg-orange-50 border-orange-200' : 'bg-orange-900/20 border-orange-800/50'} border rounded-lg p-3`}>
                           <p className="text-xs font-medium mb-1">{task.title}</p>
-                          <p className="text-[11px] text-neutral-400">{task.blockNote}</p>
+                          <p className={`text-[11px] ${themeClasses.textSecondary}`}>{task.blockNote}</p>
                         </div>
                       ))}
                     </div>
@@ -1203,7 +1213,7 @@ function TaskCoachApp() {
                       max="10"
                       value={energyLevel}
                       onChange={(e) => setEnergyLevel(parseInt(e.target.value))}
-                      className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                      className={`w-full h-2 ${theme === 'light' ? 'bg-gray-300' : 'bg-neutral-700'} rounded-lg appearance-none cursor-pointer accent-blue-500`}
                     />
                   </div>
 
@@ -1218,7 +1228,7 @@ function TaskCoachApp() {
                       max="10"
                       value={satisfactionLevel}
                       onChange={(e) => setSatisfactionLevel(parseInt(e.target.value))}
-                      className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                      className={`w-full h-2 ${theme === 'light' ? 'bg-gray-300' : 'bg-neutral-700'} rounded-lg appearance-none cursor-pointer accent-purple-500`}
                     />
                   </div>
                 </div>
@@ -1230,7 +1240,7 @@ function TaskCoachApp() {
         {activeTab === 'analyze' && (
           <div className={`${themeClasses.card} border rounded-2xl p-8`}>
             <h2 className="text-2xl font-bold mb-4">📈 Analyse de performance</h2>
-            <div className="space-y-4 text-neutral-400">
+            <div className={`space-y-4 ${themeClasses.textSecondary}`}>
               <p className="text-sm">Cette section affichera vos tendances de productivité au fil du temps :</p>
               <ul className="list-disc list-inside space-y-2 text-sm ml-4">
                 <li>Évolution du temps productif par jour (graphique)</li>
@@ -1240,8 +1250,8 @@ function TaskCoachApp() {
                 <li>Meilleurs et pires jours de la semaine</li>
                 <li>Catégories de tâches les plus chronophages</li>
               </ul>
-              <div className="mt-6 p-6 bg-neutral-900 border border-neutral-800 rounded-xl">
-                <p className="text-xs text-neutral-500 text-center">
+              <div className={`mt-6 p-6 ${themeClasses.bgSecondary} border ${themeClasses.border} rounded-xl`}>
+                <p className={`text-xs ${themeClasses.textMuted} text-center`}>
                   📊 Les graphiques et analyses détaillées seront disponibles prochainement
                 </p>
               </div>
@@ -1256,8 +1266,8 @@ function TaskCoachApp() {
 
               {history.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-neutral-500 mb-2">Aucun historique pour le moment</p>
-                  <p className="text-xs text-neutral-600">
+                  <p className={`${themeClasses.textMuted} mb-2`}>Aucun historique pour le moment</p>
+                  <p className={`text-xs ${themeClasses.textMuted}`}>
                     Cliquez sur "📅 Nouveau jour" pour archiver votre journée actuelle
                   </p>
                 </div>
@@ -1270,13 +1280,13 @@ function TaskCoachApp() {
                     return (
                       <div
                         key={entry.id}
-                        className="bg-neutral-900 border border-neutral-800 rounded-xl p-6"
+                        className={`${themeClasses.bgSecondary} border ${themeClasses.border} rounded-xl p-6`}
                       >
                         {/* Date header */}
-                        <div className="flex justify-between items-start mb-4 pb-4 border-b border-neutral-800">
+                        <div className={`flex justify-between items-start mb-4 pb-4 border-b ${themeClasses.border}`}>
                           <div>
                             <h3 className="text-lg font-semibold mb-1">{entry.date}</h3>
-                            <p className="text-xs text-neutral-500">
+                            <p className={`text-xs ${themeClasses.textMuted}`}>
                               {new Date(entry.dateISO).toLocaleDateString('fr-FR', {
                                 weekday: 'long',
                                 year: 'numeric',
@@ -1290,11 +1300,11 @@ function TaskCoachApp() {
                               <div className="text-2xl font-bold text-blue-400">
                                 {hours}h{minutes.toString().padStart(2, '0')}
                               </div>
-                              <div className="text-xs text-neutral-500">Temps productif</div>
+                              <div className={`text-xs ${themeClasses.textMuted}`}>Temps productif</div>
                             </div>
                             <button
                               onClick={() => deleteHistoryEntry(entry.id)}
-                              className="text-neutral-500 hover:text-red-400 transition-colors"
+                              className={`${themeClasses.textMuted} hover:text-red-400 transition-colors`}
                               title="Supprimer cette journée"
                             >
                               🗑️
@@ -1306,24 +1316,24 @@ function TaskCoachApp() {
                         <div className="grid grid-cols-3 gap-3 mb-4">
                           <div className="bg-gradient-to-br from-green-900/20 to-green-800/10 border border-green-800/50 rounded-lg p-3 text-center">
                             <div className="text-2xl font-bold text-green-400">{entry.completedTasksCount}</div>
-                            <div className="text-[10px] text-neutral-400">Tâches terminées</div>
+                            <div className={`text-[10px] ${themeClasses.textSecondary}`}>Tâches terminées</div>
                           </div>
                           <div className="bg-gradient-to-br from-purple-900/20 to-purple-800/10 border border-purple-800/50 rounded-lg p-3 text-center">
                             <div className="text-2xl font-bold text-purple-400">{entry.energyLevel}/10</div>
-                            <div className="text-[10px] text-neutral-400">Énergie</div>
+                            <div className={`text-[10px] ${themeClasses.textSecondary}`}>Énergie</div>
                           </div>
                           <div className="bg-gradient-to-br from-pink-900/20 to-pink-800/10 border border-pink-800/50 rounded-lg p-3 text-center">
                             <div className="text-2xl font-bold text-pink-400">{entry.satisfactionLevel}/10</div>
-                            <div className="text-[10px] text-neutral-400">Satisfaction</div>
+                            <div className={`text-[10px] ${themeClasses.textSecondary}`}>Satisfaction</div>
                           </div>
                         </div>
 
                         {/* Feedback */}
                         {entry.feedback && (
                           <div className="mb-4">
-                            <h4 className="text-sm font-semibold mb-2 text-neutral-400">💭 Remarques</h4>
-                            <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
-                              <p className="text-sm text-neutral-300">{entry.feedback}</p>
+                            <h4 className={`text-sm font-semibold mb-2 ${themeClasses.textSecondary}`}>💭 Remarques</h4>
+                            <div className={`${themeClasses.bgSecondary} border ${themeClasses.border} rounded-lg p-3`}>
+                              <p className={`text-sm ${themeClasses.text}`}>{entry.feedback}</p>
                             </div>
                           </div>
                         )}
@@ -1331,7 +1341,7 @@ function TaskCoachApp() {
                         {/* Completed Tasks */}
                         {entry.completedTasks.length > 0 && (
                           <div>
-                            <h4 className="text-sm font-semibold mb-2 text-neutral-400">
+                            <h4 className={`text-sm font-semibold mb-2 ${themeClasses.textSecondary}`}>
                               ✅ Tâches accomplies ({entry.completedTasks.length})
                             </h4>
                             <div className="space-y-2">
@@ -1342,19 +1352,19 @@ function TaskCoachApp() {
                                 return (
                                   <div
                                     key={idx}
-                                    className="bg-neutral-950 border border-neutral-800 rounded-lg p-3"
+                                    className={`${themeClasses.bgSecondary} border ${themeClasses.border} rounded-lg p-3`}
                                   >
                                     <div className="flex justify-between items-start mb-1">
                                       <h5 className="text-sm font-medium">{task.title}</h5>
-                                      <div className="text-xs text-neutral-500">
+                                      <div className={`text-xs ${themeClasses.textMuted}`}>
                                         {taskMinutes}min
                                       </div>
                                     </div>
                                     {task.description && (
-                                      <p className="text-xs text-neutral-500 mb-2">{task.description}</p>
+                                      <p className={`text-xs ${themeClasses.textMuted} mb-2`}>{task.description}</p>
                                     )}
                                     <div className="flex justify-between items-center text-[10px]">
-                                      <span className="text-neutral-600">
+                                      <span className={themeClasses.textMuted}>
                                         Estimé: {task.estimateMinutes}min
                                       </span>
                                       <span className={deviation > 0 ? 'text-orange-400' : 'text-green-400'}>
@@ -1617,7 +1627,7 @@ function TaskCoachApp() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowNewDayModal(false)}
-                className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg px-4 py-2 font-medium transition-colors"
+                className={`flex-1 ${theme === 'light' ? 'bg-gray-300 hover:bg-gray-400 text-gray-800' : 'bg-neutral-800 hover:bg-neutral-700 text-white'} rounded-lg px-4 py-2 font-medium transition-colors`}
               >
                 Annuler
               </button>
