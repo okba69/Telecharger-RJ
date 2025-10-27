@@ -55,6 +55,7 @@ function TaskCoachApp() {
   const audioContextRef = useRef(null)
   const ambientOscillatorRef = useRef(null)
   const ambientGainNodeRef = useRef(null)
+  const ambientIntervalRef = useRef(null)
 
   // Motivational messages
   const motivationalMessages = [
@@ -200,84 +201,123 @@ function TaskCoachApp() {
 
       const audioContext = new (window.AudioContext || window.webkitAudioContext)()
 
-      // Create multiple oscillators for rich, dynamic ambient sound
-      // Using pentatonic scale frequencies for pleasant harmony
-      const frequencies = [
+      // Extended pentatonic scale with multiple octaves for more variety
+      const pentatonicScale = [
+        130.81, // C3
+        146.83, // D3
+        164.81, // E3
+        196.00, // G3
+        220.00, // A3
         261.63, // C4
         293.66, // D4
         329.63, // E4
         392.00, // G4
-        440.00  // A4
+        440.00, // A4
+        523.25, // C5
+        587.33, // D5
       ]
 
+      // Create 4 oscillators that will change notes over time
+      const numVoices = 4
       const oscillators = []
       const gainNodes = []
-      const lfos = []
 
-      frequencies.forEach((freq, index) => {
-        // Main oscillator
+      for (let i = 0; i < numVoices; i++) {
         const osc = audioContext.createOscillator()
         const gain = audioContext.createGain()
 
-        // LFO for volume modulation (creates breathing effect)
-        const lfo = audioContext.createOscillator()
-        const lfoGain = audioContext.createGain()
-
         osc.type = 'sine'
-        osc.frequency.value = freq
 
-        // Add slight detune for chorus effect
-        osc.detune.value = (Math.random() - 0.5) * 10
+        // Start with random note from scale
+        const randomNote = pentatonicScale[Math.floor(Math.random() * pentatonicScale.length)]
+        osc.frequency.value = randomNote
 
-        // LFO setup - different speeds for each oscillator
-        lfo.type = 'sine'
-        lfo.frequency.value = 0.1 + (index * 0.05) // 0.1 to 0.3 Hz
-        lfoGain.gain.value = 0.008 // Modulation depth
-
-        lfo.connect(lfoGain)
-        lfoGain.connect(gain.gain)
-
-        // Base gain - stagger the volumes
-        gain.gain.setValueAtTime(0.015 + (index * 0.002), audioContext.currentTime)
+        // Start with volume at 0, will fade in
+        gain.gain.setValueAtTime(0, audioContext.currentTime)
 
         osc.connect(gain)
         gain.connect(audioContext.destination)
 
-        // Start with delay for cascading effect
-        const startTime = audioContext.currentTime + (index * 0.3)
-        osc.start(startTime)
-        lfo.start(startTime)
+        osc.start()
 
         oscillators.push(osc)
         gainNodes.push(gain)
-        lfos.push(lfo)
-      })
+      }
+
+      // Function to animate the ambient music
+      const animateMusic = () => {
+        const now = audioContext.currentTime
+
+        oscillators.forEach((osc, i) => {
+          const gain = gainNodes[i]
+
+          // Pick a new random note from the scale
+          const newNote = pentatonicScale[Math.floor(Math.random() * pentatonicScale.length)]
+
+          // Smoothly transition to new frequency over 3-5 seconds
+          const transitionTime = 3 + Math.random() * 2
+          osc.frequency.setValueAtTime(osc.frequency.value, now)
+          osc.frequency.linearRampToValueAtTime(newNote, now + transitionTime)
+
+          // Vary volume - some voices fade in, some fade out
+          const shouldBeActive = Math.random() > 0.3 // 70% chance to be active
+          const targetVolume = shouldBeActive ? (0.01 + Math.random() * 0.02) : 0
+
+          gain.gain.setValueAtTime(gain.gain.value, now)
+          gain.gain.linearRampToValueAtTime(targetVolume, now + transitionTime)
+        })
+      }
+
+      // Initial animation
+      animateMusic()
+
+      // Change notes every 4-6 seconds for continuous variation
+      const interval = setInterval(() => {
+        if (ambientOscillatorRef.current) {
+          animateMusic()
+        } else {
+          clearInterval(interval)
+        }
+      }, 4000 + Math.random() * 2000)
 
       // Store refs for cleanup
-      ambientOscillatorRef.current = [...oscillators, ...lfos, audioContext]
+      ambientOscillatorRef.current = oscillators
       ambientGainNodeRef.current = gainNodes
+      ambientIntervalRef.current = interval
+      audioContextRef.current = audioContext
     } catch (error) {
       console.log('Ambient audio not supported')
     }
   }
 
   const stopAmbientMusic = () => {
+    // Clear the interval
+    if (ambientIntervalRef.current) {
+      clearInterval(ambientIntervalRef.current)
+      ambientIntervalRef.current = null
+    }
+
+    // Stop oscillators
     if (ambientOscillatorRef.current) {
       try {
-        const allNodes = ambientOscillatorRef.current
-        const audioContext = allNodes[allNodes.length - 1]
-
-        // Stop all oscillators and LFOs
-        for (let i = 0; i < allNodes.length - 1; i++) {
-          allNodes[i].stop()
-        }
-
-        audioContext.close()
+        ambientOscillatorRef.current.forEach(osc => {
+          osc.stop()
+        })
       } catch (error) {
-        console.log('Error stopping ambient music')
+        console.log('Error stopping oscillators')
       }
       ambientOscillatorRef.current = null
       ambientGainNodeRef.current = null
+    }
+
+    // Close audio context
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close()
+      } catch (error) {
+        console.log('Error closing audio context')
+      }
+      audioContextRef.current = null
     }
   }
 
