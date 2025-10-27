@@ -39,6 +39,11 @@ function TaskCoachApp() {
   // History
   const [history, setHistory] = useState(() => loadFromStorage('history', []))
   const [currentDate, setCurrentDate] = useState(() => loadFromStorage('currentDate', new Date().toDateString()))
+  const [showNewDayModal, setShowNewDayModal] = useState(false)
+  const [newDayDate, setNewDayDate] = useState('')
+
+  // Task history (all tasks ever created)
+  const [taskHistory, setTaskHistory] = useState(() => loadFromStorage('taskHistory', []))
 
   // Focus mode & Pomodoro
   const [isFocusMode, setIsFocusMode] = useState(false)
@@ -108,6 +113,10 @@ function TaskCoachApp() {
   useEffect(() => {
     localStorage.setItem('currentDate', currentDate)
   }, [currentDate])
+
+  useEffect(() => {
+    localStorage.setItem('taskHistory', JSON.stringify(taskHistory))
+  }, [taskHistory])
 
   // ========== TIMER LOGIC ==========
   useEffect(() => {
@@ -339,16 +348,25 @@ function TaskCoachApp() {
   }
 
   // ========== HISTORY / NEW DAY ==========
+  const openNewDayModal = () => {
+    const today = new Date().toISOString().split('T')[0]
+    setNewDayDate(today)
+    setShowNewDayModal(true)
+  }
+
   const archiveDay = () => {
     // Calculate completed tasks
     const completedTasks = tasks.filter(t => t.status === 'done')
     const totalProductiveSeconds = tasks.reduce((sum, t) => sum + t.secondsSpent, 0)
 
+    // Use the selected date or today
+    const archiveDate = newDayDate ? new Date(newDayDate) : new Date()
+
     // Create history entry
     const historyEntry = {
       id: Date.now(),
-      date: currentDate,
-      dateISO: new Date().toISOString(),
+      date: archiveDate.toDateString(),
+      dateISO: archiveDate.toISOString(),
       totalProductiveSeconds,
       feedback: dailyFeedback,
       energyLevel,
@@ -377,13 +395,21 @@ function TaskCoachApp() {
     // Inbox items stay untouched
 
     // Update current date
-    setCurrentDate(new Date().toDateString())
+    setCurrentDate(archiveDate.toDateString())
 
     // Stop any running timer
     setIsRunning(false)
     setActiveTaskId(null)
 
-    alert('✅ Journée archivée ! Nouveau jour commencé.')
+    // Close modal
+    setShowNewDayModal(false)
+    setNewDayDate('')
+  }
+
+  const deleteHistoryEntry = (entryId) => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cette journée de l\'historique ?')) {
+      setHistory(history.filter(h => h.id !== entryId))
+    }
   }
 
   // ========== TASK ACTIONS ==========
@@ -463,9 +489,42 @@ function TaskCoachApp() {
     }
 
     setTasks([...tasks, newTask])
+
+    // Add to task history (without duplicates of same title)
+    const taskTemplate = {
+      title: newTaskTitle,
+      description: newTaskDescription,
+      estimateMinutes: parseInt(newTaskEstimate),
+      createdAt: Date.now()
+    }
+
+    // Check if similar task already exists in history
+    const exists = taskHistory.some(t =>
+      t.title.toLowerCase() === taskTemplate.title.toLowerCase() &&
+      t.description === taskTemplate.description
+    )
+
+    if (!exists) {
+      setTaskHistory([taskTemplate, ...taskHistory])
+    }
+
     setNewTaskTitle('')
     setNewTaskDescription('')
     setNewTaskEstimate(30)
+  }
+
+  const recreateTaskFromHistory = (historyTask) => {
+    const newTask = {
+      id: Date.now(),
+      title: historyTask.title,
+      description: historyTask.description,
+      estimateMinutes: historyTask.estimateMinutes,
+      status: 'todo',
+      blockNote: '',
+      secondsSpent: 0
+    }
+
+    setTasks([...tasks, newTask])
   }
 
   const handleDeleteTask = (taskId, e) => {
@@ -774,6 +833,36 @@ function TaskCoachApp() {
                     </button>
                   </div>
                 </form>
+
+                {/* Task History / Templates */}
+                {taskHistory.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-neutral-800">
+                    <h3 className="text-sm font-semibold mb-3 text-neutral-400">📋 Historique des tâches</h3>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {taskHistory.slice(0, 10).map((histTask, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-neutral-900 border border-neutral-800 rounded-lg p-2 flex justify-between items-start group hover:border-neutral-700 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium truncate">{histTask.title}</p>
+                            {histTask.description && (
+                              <p className="text-[10px] text-neutral-500 truncate">{histTask.description}</p>
+                            )}
+                            <p className="text-[10px] text-neutral-600">{histTask.estimateMinutes}min</p>
+                          </div>
+                          <button
+                            onClick={() => recreateTaskFromHistory(histTask)}
+                            className="ml-2 text-xs text-blue-400 hover:text-blue-300 transition-colors opacity-0 group-hover:opacity-100"
+                            title="Recréer cette tâche"
+                          >
+                            ↻
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -998,7 +1087,7 @@ function TaskCoachApp() {
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold">📊 KPIs du jour</h2>
                   <button
-                    onClick={archiveDay}
+                    onClick={openNewDayModal}
                     className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 font-medium transition-colors"
                   >
                     📅 Nouveau jour
@@ -1155,11 +1244,20 @@ function TaskCoachApp() {
                               })}
                             </p>
                           </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold text-blue-400">
-                              {hours}h{minutes.toString().padStart(2, '0')}
+                          <div className="flex items-start gap-4">
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-blue-400">
+                                {hours}h{minutes.toString().padStart(2, '0')}
+                              </div>
+                              <div className="text-xs text-neutral-500">Temps productif</div>
                             </div>
-                            <div className="text-xs text-neutral-500">Temps productif</div>
+                            <button
+                              onClick={() => deleteHistoryEntry(entry.id)}
+                              className="text-neutral-500 hover:text-red-400 transition-colors"
+                              title="Supprimer cette journée"
+                            >
+                              🗑️
+                            </button>
                           </div>
                         </div>
 
@@ -1410,6 +1508,54 @@ function TaskCoachApp() {
             />
           ))}
         </>
+      )}
+
+      {/* New Day Modal */}
+      {showNewDayModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6 max-w-md w-full mx-4 animate-fade-in">
+            <h3 className="text-xl font-bold mb-4">📅 Nouveau jour</h3>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Date de la journée à archiver</label>
+              <input
+                type="date"
+                value={newDayDate}
+                onChange={(e) => setNewDayDate(e.target.value)}
+                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <p className="text-xs text-neutral-500 mt-2">
+                Par défaut : {new Date().toLocaleDateString('fr-FR')}
+              </p>
+            </div>
+
+            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 mb-4">
+              <p className="text-sm text-neutral-300 mb-2">Cette action va :</p>
+              <ul className="text-xs text-neutral-400 space-y-1 ml-4">
+                <li>• Archiver toutes les tâches terminées</li>
+                <li>• Sauvegarder les KPIs et feedback du jour</li>
+                <li>• Conserver les tâches non terminées</li>
+                <li>• Garder les items "À faire" intacts</li>
+                <li>• Réinitialiser les niveaux énergie/satisfaction</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowNewDayModal(false)}
+                className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg px-4 py-2 font-medium transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={archiveDay}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 py-2 font-medium transition-colors"
+              >
+                Archiver
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
