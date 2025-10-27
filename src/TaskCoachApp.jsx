@@ -845,19 +845,19 @@ function TaskCoachApp() {
               </div>
 
               {/* Add New Task */}
-              <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6">
+              <div className={`${themeClasses.card} border rounded-2xl p-6`}>
                 <h2 className="text-lg font-semibold mb-4">➕ Nouvelle tâche</h2>
 
                 <form onSubmit={handleAddTask} className="space-y-3">
                   {/* Task History Selector */}
                   {taskHistory.length > 0 && (
                     <div>
-                      <label className="block text-xs text-neutral-400 mb-1">
+                      <label className={`block text-xs ${themeClasses.textSecondary} mb-1`}>
                         Ou sélectionner une ancienne tâche
                       </label>
                       <select
                         onChange={handleSelectTaskFromHistory}
-                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`w-full ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
                       >
                         <option value="">-- Nouvelle tâche --</option>
                         {taskHistory.map((histTask, idx) => (
@@ -874,7 +874,7 @@ function TaskCoachApp() {
                     value={newTaskTitle}
                     onChange={(e) => setNewTaskTitle(e.target.value)}
                     placeholder="Titre de la tâche..."
-                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     required
                   />
                   <textarea
@@ -882,13 +882,13 @@ function TaskCoachApp() {
                     onChange={(e) => setNewTaskDescription(e.target.value)}
                     placeholder="Description courte..."
                     rows="2"
-                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   />
                   <div className="flex gap-3">
                     <select
                       value={newTaskEstimate}
                       onChange={(e) => setNewTaskEstimate(e.target.value)}
-                      className="w-32 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={`w-32 ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     >
                       {timeOptions.map(time => (
                         <option key={time} value={time}>
@@ -910,7 +910,7 @@ function TaskCoachApp() {
             {/* ========== COLUMN B: EXÉCUTER ========== */}
             <div className="space-y-6">
               {/* Task List */}
-              <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6">
+              <div className={`${themeClasses.card} border rounded-2xl p-6`}>
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold">📋 Mes tâches</h2>
                   <button
@@ -1124,7 +1124,7 @@ function TaskCoachApp() {
             {/* ========== COLUMN C: BILAN DU JOUR ========== */}
             <div className="space-y-6">
               {/* KPIs */}
-              <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6">
+              <div className={`${themeClasses.card} border rounded-2xl p-6`}>
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold">📊 KPIs du jour</h2>
                   <button
@@ -1180,7 +1180,7 @@ function TaskCoachApp() {
               </div>
 
               {/* Feedback Personnel */}
-              <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6">
+              <div className={`${themeClasses.card} border rounded-2xl p-6`}>
                 <h2 className="text-lg font-semibold mb-4">💭 Feedback perso</h2>
 
                 <textarea
@@ -1188,7 +1188,7 @@ function TaskCoachApp() {
                   onChange={(e) => setDailyFeedback(e.target.value)}
                   placeholder="Comment s'est passée votre journée ? Qu'avez-vous appris ?"
                   rows="4"
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-purple-500 mb-4"
+                  className={`w-full ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 mb-4`}
                 />
 
                 <div className="space-y-4">
@@ -1228,7 +1228,7 @@ function TaskCoachApp() {
         )}
 
         {activeTab === 'analyze' && (
-          <div className="bg-[#111] border border-neutral-800 rounded-2xl p-8">
+          <div className={`${themeClasses.card} border rounded-2xl p-8`}>
             <h2 className="text-2xl font-bold mb-4">📈 Analyse de performance</h2>
             <div className="space-y-4 text-neutral-400">
               <p className="text-sm">Cette section affichera vos tendances de productivité au fil du temps :</p>
@@ -1251,7 +1251,7 @@ function TaskCoachApp() {
 
         {activeTab === 'history' && (
           <div className="space-y-6">
-            <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6">
+            <div className={`${themeClasses.card} border rounded-2xl p-6`}>
               <h2 className="text-2xl font-bold mb-6">📅 Historique</h2>
 
               {history.length === 0 ? (
@@ -1587,7 +1587,7 @@ function TaskCoachApp() {
       {/* New Day Modal */}
       {showNewDayModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6 max-w-md w-full mx-4 animate-fade-in">
+          <div className={`${themeClasses.card} border rounded-2xl p-6 max-w-md w-full mx-4 animate-fade-in`}>
             <h3 className="text-xl font-bold mb-4">📅 Nouveau jour</h3>
 
             <div className="mb-4">
@@ -1596,16 +1596,16 @@ function TaskCoachApp() {
                 type="date"
                 value={newDayDate}
                 onChange={(e) => setNewDayDate(e.target.value)}
-                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={`w-full ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500`}
               />
-              <p className="text-xs text-neutral-500 mt-2">
+              <p className={`text-xs ${themeClasses.textMuted} mt-2`}>
                 Par défaut : {new Date().toLocaleDateString('fr-FR')}
               </p>
             </div>
 
-            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 mb-4">
-              <p className="text-sm text-neutral-300 mb-2">Cette action va :</p>
-              <ul className="text-xs text-neutral-400 space-y-1 ml-4">
+            <div className={`${themeClasses.bgSecondary} border ${themeClasses.border} rounded-lg p-4 mb-4`}>
+              <p className="text-sm mb-2">Cette action va :</p>
+              <ul className={`text-xs ${themeClasses.textSecondary} space-y-1 ml-4`}>
                 <li>• Archiver toutes les tâches terminées</li>
                 <li>• Sauvegarder les KPIs et feedback du jour</li>
                 <li>• Conserver les tâches non terminées</li>
