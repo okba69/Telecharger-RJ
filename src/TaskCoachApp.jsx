@@ -45,6 +45,9 @@ function TaskCoachApp() {
   // Task history (all tasks ever created)
   const [taskHistory, setTaskHistory] = useState(() => loadFromStorage('taskHistory', []))
 
+  // Theme
+  const [theme, setTheme] = useState(() => loadFromStorage('theme', 'dark'))
+
   // Focus mode & Pomodoro
   const [isFocusMode, setIsFocusMode] = useState(false)
   const [isLaunching, setIsLaunching] = useState(false)
@@ -117,6 +120,10 @@ function TaskCoachApp() {
   useEffect(() => {
     localStorage.setItem('taskHistory', JSON.stringify(taskHistory))
   }, [taskHistory])
+
+  useEffect(() => {
+    localStorage.setItem('theme', JSON.stringify(theme))
+  }, [theme])
 
   // ========== TIMER LOGIC ==========
   useEffect(() => {
@@ -714,11 +721,38 @@ function TaskCoachApp() {
   // Time options in 15 min increments
   const timeOptions = [15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240]
 
+  // Theme colors
+  const themeClasses = theme === 'light' ? {
+    bg: 'bg-gray-50',
+    bgSecondary: 'bg-white',
+    text: 'text-gray-900',
+    textSecondary: 'text-gray-600',
+    textMuted: 'text-gray-400',
+    border: 'border-gray-200',
+    borderSecondary: 'border-gray-300',
+    hover: 'hover:bg-gray-100',
+    input: 'bg-gray-100 border-gray-300 text-gray-900 placeholder-gray-500',
+    card: 'bg-white border-gray-200',
+    header: 'bg-white border-gray-200'
+  } : {
+    bg: 'bg-[#0a0a0a]',
+    bgSecondary: 'bg-[#111]',
+    text: 'text-neutral-200',
+    textSecondary: 'text-neutral-400',
+    textMuted: 'text-neutral-500',
+    border: 'border-neutral-800',
+    borderSecondary: 'border-neutral-700',
+    hover: 'hover:bg-neutral-800',
+    input: 'bg-neutral-900 border-neutral-700 text-neutral-200 placeholder-neutral-500',
+    card: 'bg-[#111] border-neutral-800',
+    header: 'bg-[#111] border-neutral-800'
+  }
+
   // ========== RENDER ==========
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-neutral-200">
+    <div className={`min-h-screen ${themeClasses.bg} ${themeClasses.text}`}>
       {/* Header */}
-      <header className="border-b border-neutral-800 bg-[#111]">
+      <header className={`border-b ${themeClasses.header}`}>
         <div className="max-w-[1800px] mx-auto px-6 py-4">
           <h1 className="text-2xl font-bold mb-4">ProductivityHub</h1>
 
@@ -730,8 +764,8 @@ function TaskCoachApp() {
                 onClick={() => setActiveTab(tab)}
                 className={`px-6 py-2 rounded-lg text-sm font-medium transition-colors ${
                   activeTab === tab
-                    ? 'bg-neutral-700 text-white'
-                    : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'
+                    ? theme === 'light' ? 'bg-blue-100 text-blue-900' : 'bg-neutral-700 text-white'
+                    : `${themeClasses.textSecondary} ${themeClasses.hover}`
                 }`}
               >
                 {tab === 'today' && "Aujourd'hui"}
@@ -751,7 +785,7 @@ function TaskCoachApp() {
             {/* ========== COLUMN A: PLANIFIER ========== */}
             <div className="space-y-6">
               {/* À faire (Inbox with checkbox) */}
-              <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6">
+              <div className={`${themeClasses.card} border rounded-2xl p-6`}>
                 <h2 className="text-lg font-semibold mb-4">✅ À faire</h2>
 
                 <form onSubmit={handleAddInboxItem} className="mb-4">
@@ -762,7 +796,7 @@ function TaskCoachApp() {
                       onChange={(e) => setNewInboxItem(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddInboxItem(e)}
                       placeholder="Ajouter une chose à faire..."
-                      className="flex-1 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={`flex-1 ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     />
                     <button
                       type="submit"
@@ -1343,24 +1377,57 @@ function TaskCoachApp() {
         )}
 
         {activeTab === 'settings' && (
-          <div className="bg-[#111] border border-neutral-800 rounded-2xl p-8">
-            <h2 className="text-2xl font-bold mb-4">⚙️ Paramètres</h2>
-            <div className="space-y-4 text-neutral-400">
-              <p className="text-sm">Personnalisez votre expérience de productivité :</p>
-              <ul className="list-disc list-inside space-y-2 text-sm ml-4">
-                <li>Heure de début de journée (par défaut 9h00)</li>
-                <li>Durée d'un bloc focus (Pomodoro 25min, Deep Work 50min, Custom...)</li>
-                <li>Rappels automatiques (pause, hydratation, étirements)</li>
-                <li>Objectif de temps productif quotidien</li>
-                <li>Notifications pour les tâches dépassant l'estimation</li>
-                <li>Export automatique du bilan quotidien (PDF, JSON, CSV)</li>
-                <li>Thème (Dark, Light, Auto)</li>
-                <li>Intégration calendrier (Google Calendar, Outlook)</li>
-              </ul>
-              <div className="mt-6 p-6 bg-neutral-900 border border-neutral-800 rounded-xl">
-                <p className="text-xs text-neutral-500 text-center">
-                  🔧 Les options de configuration seront disponibles prochainement
-                </p>
+          <div className={`${themeClasses.card} border rounded-2xl p-8`}>
+            <h2 className="text-2xl font-bold mb-6">⚙️ Paramètres</h2>
+
+            <div className="space-y-6">
+              {/* Theme Setting */}
+              <div className={`${themeClasses.bgSecondary} border ${themeClasses.border} rounded-xl p-6`}>
+                <h3 className="text-lg font-semibold mb-4">🎨 Apparence</h3>
+
+                <div>
+                  <label className="block text-sm font-medium mb-3">Thème</label>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setTheme('dark')}
+                      className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
+                        theme === 'dark'
+                          ? 'bg-blue-600 text-white border-2 border-blue-500'
+                          : theme === 'light'
+                          ? 'bg-gray-200 text-gray-700 border-2 border-gray-300 hover:bg-gray-300'
+                          : 'bg-neutral-800 text-neutral-300 border-2 border-neutral-700 hover:bg-neutral-700'
+                      }`}
+                    >
+                      🌙 Mode sombre
+                    </button>
+                    <button
+                      onClick={() => setTheme('light')}
+                      className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
+                        theme === 'light'
+                          ? 'bg-blue-600 text-white border-2 border-blue-500'
+                          : theme === 'dark'
+                          ? 'bg-neutral-800 text-neutral-300 border-2 border-neutral-700 hover:bg-neutral-700'
+                          : 'bg-gray-200 text-gray-700 border-2 border-gray-300 hover:bg-gray-300'
+                      }`}
+                    >
+                      ☀️ Mode clair
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Future settings placeholder */}
+              <div className={`${themeClasses.bgSecondary} border ${themeClasses.border} rounded-xl p-6`}>
+                <h3 className="text-lg font-semibold mb-4">⏰ Paramètres à venir</h3>
+                <ul className={`list-disc list-inside space-y-2 text-sm ${themeClasses.textSecondary} ml-4`}>
+                  <li>Heure de début de journée (par défaut 9h00)</li>
+                  <li>Durée d'un bloc focus (Pomodoro 25min, Deep Work 50min, Custom...)</li>
+                  <li>Rappels automatiques (pause, hydratation, étirements)</li>
+                  <li>Objectif de temps productif quotidien</li>
+                  <li>Notifications pour les tâches dépassant l'estimation</li>
+                  <li>Export automatique du bilan quotidien (PDF, JSON, CSV)</li>
+                  <li>Intégration calendrier (Google Calendar, Outlook)</li>
+                </ul>
               </div>
             </div>
           </div>
