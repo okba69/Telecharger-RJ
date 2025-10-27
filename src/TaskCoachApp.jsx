@@ -335,13 +335,17 @@ function TaskCoachApp() {
     setIsRunning(true)
     lastTickRef.current = Date.now()
 
-    if (task.status === 'todo') {
-      setTasks(prevTasks =>
-        prevTasks.map(t =>
-          t.id === taskId ? { ...t, status: 'doing' } : t
-        )
-      )
-    }
+    // Set clicked task to 'doing' and all others that were 'doing' to 'paused'
+    setTasks(prevTasks =>
+      prevTasks.map(t => {
+        if (t.id === taskId) {
+          return { ...t, status: 'doing' }
+        } else if (t.status === 'doing') {
+          return { ...t, status: 'paused' }
+        }
+        return t
+      })
+    )
   }
 
   const handlePause = () => {
@@ -518,13 +522,11 @@ function TaskCoachApp() {
         pomodoroTickRef.current = Date.now()
         const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
         setMotivationalMessage(randomMsg)
-        playAmbientMusic()
       }, 1500)
     } else {
       // Stopping focus mode
       setIsFocusMode(false)
       setIsPomodoroRunning(false)
-      stopAmbientMusic()
     }
   }
 
