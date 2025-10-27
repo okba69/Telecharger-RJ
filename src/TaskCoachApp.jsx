@@ -36,6 +36,10 @@ function TaskCoachApp() {
   const [energyLevel, setEnergyLevel] = useState(() => loadFromStorage('energyLevel', 5))
   const [satisfactionLevel, setSatisfactionLevel] = useState(() => loadFromStorage('satisfactionLevel', 5))
 
+  // History
+  const [history, setHistory] = useState(() => loadFromStorage('history', []))
+  const [currentDate, setCurrentDate] = useState(() => loadFromStorage('currentDate', new Date().toDateString()))
+
   // Focus mode & Pomodoro
   const [isFocusMode, setIsFocusMode] = useState(false)
   const [isLaunching, setIsLaunching] = useState(false)
@@ -96,6 +100,14 @@ function TaskCoachApp() {
   useEffect(() => {
     localStorage.setItem('satisfactionLevel', JSON.stringify(satisfactionLevel))
   }, [satisfactionLevel])
+
+  useEffect(() => {
+    localStorage.setItem('history', JSON.stringify(history))
+  }, [history])
+
+  useEffect(() => {
+    localStorage.setItem('currentDate', currentDate)
+  }, [currentDate])
 
   // ========== TIMER LOGIC ==========
   useEffect(() => {
@@ -324,6 +336,54 @@ function TaskCoachApp() {
   const triggerConfetti = () => {
     setShowConfetti(true)
     setTimeout(() => setShowConfetti(false), 3000)
+  }
+
+  // ========== HISTORY / NEW DAY ==========
+  const archiveDay = () => {
+    // Calculate completed tasks
+    const completedTasks = tasks.filter(t => t.status === 'done')
+    const totalProductiveSeconds = tasks.reduce((sum, t) => sum + t.secondsSpent, 0)
+
+    // Create history entry
+    const historyEntry = {
+      id: Date.now(),
+      date: currentDate,
+      dateISO: new Date().toISOString(),
+      totalProductiveSeconds,
+      feedback: dailyFeedback,
+      energyLevel,
+      satisfactionLevel,
+      completedTasksCount: completedTasks.length,
+      completedTasks: completedTasks.map(t => ({
+        title: t.title,
+        description: t.description,
+        estimateMinutes: t.estimateMinutes,
+        secondsSpent: t.secondsSpent
+      }))
+    }
+
+    // Add to history
+    setHistory([historyEntry, ...history])
+
+    // Reset daily data
+    setDailyFeedback('')
+    setEnergyLevel(5)
+    setSatisfactionLevel(5)
+
+    // Remove completed tasks, keep incomplete ones
+    setTasks(tasks.filter(t => t.status !== 'done'))
+
+    // Keep inbox items as they are (don't reset checkboxes)
+    // Inbox items stay untouched
+
+    // Update current date
+    setCurrentDate(new Date().toDateString())
+
+    // Stop any running timer
+    setIsRunning(false)
+    setActiveTaskId(null)
+
+    alert('✅ Journée archivée ! Nouveau jour commencé.')
   }
 
   // ========== TASK ACTIONS ==========
@@ -935,7 +995,15 @@ function TaskCoachApp() {
             <div className="space-y-6">
               {/* KPIs */}
               <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6">
-                <h2 className="text-lg font-semibold mb-4">📊 KPIs du jour</h2>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold">📊 KPIs du jour</h2>
+                  <button
+                    onClick={archiveDay}
+                    className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-3 py-1.5 font-medium transition-colors"
+                  >
+                    📅 Nouveau jour
+                  </button>
+                </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-800 rounded-xl p-4">
@@ -1052,24 +1120,119 @@ function TaskCoachApp() {
         )}
 
         {activeTab === 'history' && (
-          <div className="bg-[#111] border border-neutral-800 rounded-2xl p-8">
-            <h2 className="text-2xl font-bold mb-4">📅 Historique</h2>
-            <div className="space-y-4 text-neutral-400">
-              <p className="text-sm">
-                Cette section conservera l'historique complet de vos journées de travail :
-              </p>
-              <ul className="list-disc list-inside space-y-2 text-sm ml-4">
-                <li>Liste de toutes vos journées passées</li>
-                <li>Détails des tâches accomplies chaque jour</li>
-                <li>Blocages rencontrés et comment vous les avez résolus</li>
-                <li>Évolution de votre énergie et satisfaction</li>
-                <li>Recherche et filtres par date, catégorie, mots-clés</li>
-              </ul>
-              <div className="mt-6 p-6 bg-neutral-900 border border-neutral-800 rounded-xl">
-                <p className="text-xs text-neutral-500 text-center">
-                  💾 L'historique sera automatiquement sauvegardé à la fin de chaque journée
-                </p>
-              </div>
+          <div className="space-y-6">
+            <div className="bg-[#111] border border-neutral-800 rounded-2xl p-6">
+              <h2 className="text-2xl font-bold mb-6">📅 Historique</h2>
+
+              {history.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-neutral-500 mb-2">Aucun historique pour le moment</p>
+                  <p className="text-xs text-neutral-600">
+                    Cliquez sur "📅 Nouveau jour" pour archiver votre journée actuelle
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {history.map(entry => {
+                    const hours = Math.floor(entry.totalProductiveSeconds / 3600)
+                    const minutes = Math.floor((entry.totalProductiveSeconds % 3600) / 60)
+
+                    return (
+                      <div
+                        key={entry.id}
+                        className="bg-neutral-900 border border-neutral-800 rounded-xl p-6"
+                      >
+                        {/* Date header */}
+                        <div className="flex justify-between items-start mb-4 pb-4 border-b border-neutral-800">
+                          <div>
+                            <h3 className="text-lg font-semibold mb-1">{entry.date}</h3>
+                            <p className="text-xs text-neutral-500">
+                              {new Date(entry.dateISO).toLocaleDateString('fr-FR', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-blue-400">
+                              {hours}h{minutes.toString().padStart(2, '0')}
+                            </div>
+                            <div className="text-xs text-neutral-500">Temps productif</div>
+                          </div>
+                        </div>
+
+                        {/* KPIs Grid */}
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                          <div className="bg-gradient-to-br from-green-900/20 to-green-800/10 border border-green-800/50 rounded-lg p-3 text-center">
+                            <div className="text-2xl font-bold text-green-400">{entry.completedTasksCount}</div>
+                            <div className="text-[10px] text-neutral-400">Tâches terminées</div>
+                          </div>
+                          <div className="bg-gradient-to-br from-purple-900/20 to-purple-800/10 border border-purple-800/50 rounded-lg p-3 text-center">
+                            <div className="text-2xl font-bold text-purple-400">{entry.energyLevel}/10</div>
+                            <div className="text-[10px] text-neutral-400">Énergie</div>
+                          </div>
+                          <div className="bg-gradient-to-br from-pink-900/20 to-pink-800/10 border border-pink-800/50 rounded-lg p-3 text-center">
+                            <div className="text-2xl font-bold text-pink-400">{entry.satisfactionLevel}/10</div>
+                            <div className="text-[10px] text-neutral-400">Satisfaction</div>
+                          </div>
+                        </div>
+
+                        {/* Feedback */}
+                        {entry.feedback && (
+                          <div className="mb-4">
+                            <h4 className="text-sm font-semibold mb-2 text-neutral-400">💭 Remarques</h4>
+                            <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
+                              <p className="text-sm text-neutral-300">{entry.feedback}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Completed Tasks */}
+                        {entry.completedTasks.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-semibold mb-2 text-neutral-400">
+                              ✅ Tâches accomplies ({entry.completedTasks.length})
+                            </h4>
+                            <div className="space-y-2">
+                              {entry.completedTasks.map((task, idx) => {
+                                const taskMinutes = Math.floor(task.secondsSpent / 60)
+                                const deviation = taskMinutes - task.estimateMinutes
+
+                                return (
+                                  <div
+                                    key={idx}
+                                    className="bg-neutral-950 border border-neutral-800 rounded-lg p-3"
+                                  >
+                                    <div className="flex justify-between items-start mb-1">
+                                      <h5 className="text-sm font-medium">{task.title}</h5>
+                                      <div className="text-xs text-neutral-500">
+                                        {taskMinutes}min
+                                      </div>
+                                    </div>
+                                    {task.description && (
+                                      <p className="text-xs text-neutral-500 mb-2">{task.description}</p>
+                                    )}
+                                    <div className="flex justify-between items-center text-[10px]">
+                                      <span className="text-neutral-600">
+                                        Estimé: {task.estimateMinutes}min
+                                      </span>
+                                      <span className={deviation > 0 ? 'text-orange-400' : 'text-green-400'}>
+                                        Écart: {deviation > 0 ? '+' : ''}{deviation}min
+                                      </span>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
