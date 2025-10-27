@@ -331,21 +331,9 @@ function TaskCoachApp() {
     const task = tasks.find(t => t.id === taskId)
     if (!task || task.status === 'done') return
 
+    // Just select the task, don't start timer automatically
     setActiveTaskId(taskId)
-    setIsRunning(true)
-    lastTickRef.current = Date.now()
-
-    // Set clicked task to 'doing' and all others that were 'doing' to 'paused'
-    setTasks(prevTasks =>
-      prevTasks.map(t => {
-        if (t.id === taskId) {
-          return { ...t, status: 'doing' }
-        } else if (t.status === 'doing') {
-          return { ...t, status: 'paused' }
-        }
-        return t
-      })
-    )
+    setIsRunning(false) // User must click "Reprendre" to start timer
   }
 
   const handlePause = () => {
@@ -363,10 +351,16 @@ function TaskCoachApp() {
     setIsRunning(true)
     lastTickRef.current = Date.now()
     if (activeTaskId) {
+      // Set active task to 'doing' and all others that were 'doing' to 'paused'
       setTasks(prevTasks =>
-        prevTasks.map(t =>
-          t.id === activeTaskId ? { ...t, status: 'doing' } : t
-        )
+        prevTasks.map(t => {
+          if (t.id === activeTaskId) {
+            return { ...t, status: 'doing' }
+          } else if (t.status === 'doing') {
+            return { ...t, status: 'paused' }
+          }
+          return t
+        })
       )
     }
   }
@@ -904,7 +898,7 @@ function TaskCoachApp() {
                         onClick={handleResume}
                         className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-3 font-medium transition-colors"
                       >
-                        ▶️ Reprendre
+                        {activeTask.secondsSpent === 0 ? '▶️ Démarrer' : '▶️ Reprendre'}
                       </button>
                     )}
                     <button
