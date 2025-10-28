@@ -2,11 +2,8 @@ import { createClient } from '@supabase/supabase-js'
 
 // Configuration Supabase
 // IMPORTANT: Créez un fichier .env.local à la racine avec vos clés
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'VOTRE_SUPABASE_URL'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'VOTRE_SUPABASE_ANON_KEY'
-
-// Créer le client Supabase
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co'
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDUxOTIwMDAsImV4cCI6MTk2MDc2ODAwMH0.placeholder'
 
 // Fonction helper pour vérifier si Supabase est configuré
 export const isSupabaseConfigured = () => {
@@ -15,8 +12,10 @@ export const isSupabaseConfigured = () => {
 
   return url &&
          key &&
-         url !== 'VOTRE_SUPABASE_URL' &&
-         key !== 'VOTRE_SUPABASE_ANON_KEY' &&
-         !url.includes('votre') &&
-         !key.includes('votre')
+         url.includes('supabase.co') &&
+         key.startsWith('eyJ')
 }
+
+// Créer le client Supabase avec des valeurs valides par défaut
+// (même si ce sont des placeholders, cela ne bloque pas l'app)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
