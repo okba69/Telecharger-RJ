@@ -1567,74 +1567,136 @@ function TaskCoachApp() {
           </button>
 
           {/* Main content */}
-          <div className="relative max-w-2xl w-full">
+          <div className="relative max-w-3xl w-full">
             {/* Task info */}
             <div className="text-center mb-8 focus-fade-in">
               <h2 className="text-3xl font-bold mb-3 text-white">{activeTask?.title}</h2>
               <p className="text-lg text-purple-200">{activeTask?.description}</p>
             </div>
 
-            {/* Circular Progress with Timer */}
-            <div className="flex justify-center mb-8 focus-zoom-in">
-              <div className="relative">
-                {/* SVG Circular Progress */}
-                <svg width="280" height="280" className="transform -rotate-90">
-                  {/* Background circle */}
-                  <circle
-                    cx="140"
-                    cy="140"
-                    r="120"
-                    stroke="rgba(255, 255, 255, 0.1)"
-                    strokeWidth="12"
-                    fill="none"
-                  />
-                  {/* Progress circle */}
-                  <circle
-                    cx="140"
-                    cy="140"
-                    r="120"
-                    stroke="url(#gradient)"
-                    strokeWidth="12"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeDasharray={754}
-                    strokeDashoffset={754 * (1 - (pomodoroMode === 'work' ? (25 * 60 - pomodoroSeconds) / (25 * 60) : (5 * 60 - pomodoroSeconds) / (5 * 60)))}
-                    className="transition-all duration-1000"
-                  />
-                  <defs>
-                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#a855f7" />
-                      <stop offset="100%" stopColor="#ec4899" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-
-                {/* Timer in center */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="text-7xl font-bold font-mono text-white mb-2">
-                    {formatPomodoroTime(pomodoroSeconds)}
-                  </div>
-                  <div className="text-sm text-purple-300 uppercase tracking-wider">
-                    {pomodoroMode === 'work' ? '🎯 Focus Session' : '☕ Break Time'}
-                  </div>
+            {/* MAIN DISPLAY: Task Time - BIG */}
+            <div className="flex justify-center mb-12 focus-zoom-in">
+              <div className="text-center">
+                <div className="text-[120px] leading-none font-bold font-mono text-white mb-4">
+                  {formatTime(activeTask?.secondsSpent || 0)}
+                </div>
+                <div className="text-2xl text-purple-300 uppercase tracking-wider mb-2">
+                  Temps de la tâche
+                </div>
+                <div className="text-sm text-purple-400">
+                  Estimé: {activeTask?.estimateMinutes}min •
+                  Écart: {Math.floor((activeTask?.secondsSpent || 0) / 60) - (activeTask?.estimateMinutes || 0)}min
                 </div>
               </div>
             </div>
 
-            {/* Controls */}
-            <div className="flex justify-center gap-4 mb-8 focus-fade-in">
-              <button
-                onClick={handlePomodoroToggle}
-                className="px-8 py-4 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-2xl text-white font-semibold text-lg transition-all transform hover:scale-105"
-              >
-                {isPomodoroRunning ? '⏸️ Pause' : '▶️ Start'}
-              </button>
-              <button
-                onClick={handlePomodoroReset}
-                className="px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-2xl text-white font-semibold text-lg transition-all transform hover:scale-105"
-              >
-                🔄 Reset
-              </button>
+            {/* Pomodoro Section - Smaller */}
+            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 mb-8">
+              <div className="flex items-center gap-6">
+                {/* Pomodoro Timer - Smaller Circle */}
+                <div className="relative flex-shrink-0">
+                  <svg width="140" height="140" className="transform -rotate-90">
+                    {/* Background circle */}
+                    <circle
+                      cx="70"
+                      cy="70"
+                      r="60"
+                      stroke="rgba(255, 255, 255, 0.1)"
+                      strokeWidth="8"
+                      fill="none"
+                    />
+                    {/* Progress circle */}
+                    <circle
+                      cx="70"
+                      cy="70"
+                      r="60"
+                      stroke="url(#gradient)"
+                      strokeWidth="8"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeDasharray={377}
+                      strokeDashoffset={377 * (1 - (pomodoroMode === 'work' ? (25 * 60 - pomodoroSeconds) / (25 * 60) : (5 * 60 - pomodoroSeconds) / (5 * 60)))}
+                      className="transition-all duration-1000"
+                    />
+                    <defs>
+                      <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#a855f7" />
+                        <stop offset="100%" stopColor="#ec4899" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  {/* Timer in center */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <div className="text-3xl font-bold font-mono text-white">
+                      {formatPomodoroTime(pomodoroSeconds)}
+                    </div>
+                    <div className="text-[10px] text-purple-300 uppercase tracking-wider">
+                      {pomodoroMode === 'work' ? '🎯 Focus' : '☕ Break'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pomodoro Info and Controls */}
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white mb-3">Mode Pomodoro</h3>
+
+                  {/* Cycle Visualization */}
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="text-xs text-purple-300">Cycle actuel</div>
+                      <div className="text-sm font-bold text-white">🍅 {pomodoroCount}</div>
+                    </div>
+                    <div className="flex gap-1 h-2">
+                      {/* 25min work blocks */}
+                      {[...Array(5)].map((_, i) => (
+                        <div
+                          key={`work-${i}`}
+                          className={`flex-[5] rounded ${
+                            i < pomodoroCount
+                              ? 'bg-purple-500'
+                              : i === pomodoroCount && pomodoroMode === 'work'
+                              ? 'bg-purple-400 animate-pulse'
+                              : 'bg-white/20'
+                          }`}
+                        />
+                      ))}
+                      {/* 5min break blocks */}
+                      {[...Array(4)].map((_, i) => (
+                        <div
+                          key={`break-${i}`}
+                          className={`flex-[1] rounded ${
+                            i < pomodoroCount
+                              ? 'bg-pink-500'
+                              : i === pomodoroCount && pomodoroMode === 'break'
+                              ? 'bg-pink-400 animate-pulse'
+                              : 'bg-white/20'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex justify-between text-[10px] text-purple-400 mt-1">
+                      <span>25min × 4</span>
+                      <span>5min × 4</span>
+                    </div>
+                  </div>
+
+                  {/* Controls */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handlePomodoroToggle}
+                      className="flex-1 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-white text-sm font-semibold transition-all"
+                    >
+                      {isPomodoroRunning ? '⏸️ Pause' : '▶️ Start'}
+                    </button>
+                    <button
+                      onClick={handlePomodoroReset}
+                      className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg text-white text-sm font-semibold transition-all"
+                    >
+                      🔄
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Motivational Message */}
@@ -1645,18 +1707,6 @@ function TaskCoachApp() {
                 </div>
               </div>
             )}
-
-            {/* Stats */}
-            <div className="mt-8 flex justify-center gap-6 text-center focus-fade-in">
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl px-6 py-3">
-                <div className="text-2xl font-bold text-white">🍅 {pomodoroCount}</div>
-                <div className="text-xs text-purple-300">Pomodoros</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl px-6 py-3">
-                <div className="text-2xl font-bold text-white">{formatTime(activeTask?.secondsSpent || 0)}</div>
-                <div className="text-xs text-purple-300">Total Time</div>
-              </div>
-            </div>
           </div>
         </div>
       )}
