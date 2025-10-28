@@ -25,6 +25,7 @@ function TaskCoachApp() {
   // Inbox (renamed to "À faire")
   const [inboxItems, setInboxItems] = useState(() => loadFromStorage('inboxItems', []))
   const [newInboxItem, setNewInboxItem] = useState('')
+  const [inboxCategory, setInboxCategory] = useState('travail') // 'travail' or 'ecole'
 
   // New task form
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -604,18 +605,41 @@ function TaskCoachApp() {
     e.preventDefault()
     if (!newInboxItem.trim()) return
 
-    setInboxItems([...inboxItems, { id: Date.now(), text: newInboxItem, completed: false }])
+    setInboxItems([...inboxItems, {
+      id: Date.now(),
+      text: newInboxItem,
+      completed: false,
+      category: inboxCategory
+    }])
     setNewInboxItem('')
   }
 
   const handleToggleInboxItem = (id) => {
-    setInboxItems(inboxItems.map(item =>
+    const updatedItems = inboxItems.map(item =>
       item.id === id ? { ...item, completed: !item.completed } : item
-    ))
+    )
+
+    // Sort: uncompleted items first, completed items at the bottom
+    const sortedItems = [
+      ...updatedItems.filter(item => !item.completed),
+      ...updatedItems.filter(item => item.completed)
+    ]
+
+    setInboxItems(sortedItems)
   }
 
   const handleRemoveInboxItem = (id) => {
     setInboxItems(inboxItems.filter(item => item.id !== id))
+  }
+
+  const handleCopyInboxItem = (item) => {
+    const copiedItem = {
+      id: Date.now(),
+      text: item.text,
+      completed: false,
+      category: item.category || 'travail'
+    }
+    setInboxItems([...inboxItems, copiedItem])
   }
 
   // Drag and drop for inbox
@@ -796,6 +820,38 @@ function TaskCoachApp() {
               <div className={`${themeClasses.card} border rounded-2xl p-6`}>
                 <h2 className="text-lg font-semibold mb-4">✅ À faire</h2>
 
+                {/* Category Selector */}
+                <div className="flex gap-2 mb-4">
+                  <button
+                    onClick={() => setInboxCategory('travail')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                      inboxCategory === 'travail'
+                        ? theme === 'light'
+                          ? 'bg-blue-100 text-blue-800 border-2 border-blue-300'
+                          : 'bg-blue-900/30 text-blue-300 border-2 border-blue-700'
+                        : theme === 'light'
+                        ? 'bg-gray-100 text-gray-600 border-2 border-gray-200'
+                        : 'bg-neutral-800 text-neutral-400 border-2 border-neutral-700'
+                    }`}
+                  >
+                    💼 Travail
+                  </button>
+                  <button
+                    onClick={() => setInboxCategory('ecole')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                      inboxCategory === 'ecole'
+                        ? theme === 'light'
+                          ? 'bg-purple-100 text-purple-800 border-2 border-purple-300'
+                          : 'bg-purple-900/30 text-purple-300 border-2 border-purple-700'
+                        : theme === 'light'
+                        ? 'bg-gray-100 text-gray-600 border-2 border-gray-200'
+                        : 'bg-neutral-800 text-neutral-400 border-2 border-neutral-700'
+                    }`}
+                  >
+                    🎓 École
+                  </button>
+                </div>
+
                 <form onSubmit={handleAddInboxItem} className="mb-4">
                   <div className="flex gap-2">
                     <input
@@ -815,37 +871,58 @@ function TaskCoachApp() {
                   </div>
                 </form>
 
-                <div className="space-y-2">
-                  {inboxItems.map(item => (
-                    <div
-                      key={item.id}
-                      draggable
-                      onDragStart={(e) => handleInboxDragStart(e, item)}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleInboxDrop(e, item)}
-                      onDragEnd={handleInboxDragEnd}
-                      className={`${themeClasses.inboxItem} border rounded-lg p-3 flex items-center gap-3 cursor-move transition-all ${
-                        draggedInboxItem?.id === item.id ? 'opacity-50' : ''
-                      }`}
-                    >
-                      <span className={`${themeClasses.textMuted} text-xs cursor-grab`}>⋮⋮</span>
-                      <input
-                        type="checkbox"
-                        checked={item.completed}
-                        onChange={() => handleToggleInboxItem(item.id)}
-                        className={`w-4 h-4 rounded ${theme === 'light' ? 'border-gray-400' : 'border-neutral-600'} text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer`}
-                      />
-                      <p className={`text-sm flex-1 ${item.completed ? `line-through ${themeClasses.textMuted}` : ''}`}>
-                        {item.text}
-                      </p>
-                      <button
-                        onClick={() => handleRemoveInboxItem(item.id)}
-                        className={`${themeClasses.textMuted} hover:text-red-400 text-xs transition-colors`}
+                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                  {inboxItems.map(item => {
+                    const category = item.category || 'travail'
+                    const categoryColors = category === 'ecole'
+                      ? theme === 'light'
+                        ? 'bg-purple-50 border-purple-200'
+                        : 'bg-purple-900/10 border-purple-800/30'
+                      : theme === 'light'
+                      ? 'bg-blue-50 border-blue-200'
+                      : 'bg-blue-900/10 border-blue-800/30'
+
+                    return (
+                      <div
+                        key={item.id}
+                        draggable
+                        onDragStart={(e) => handleInboxDragStart(e, item)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleInboxDrop(e, item)}
+                        onDragEnd={handleInboxDragEnd}
+                        className={`${categoryColors} border rounded-lg p-3 flex items-center gap-3 cursor-move transition-all ${
+                          draggedInboxItem?.id === item.id ? 'opacity-50' : ''
+                        }`}
                       >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
+                        <span className={`${themeClasses.textMuted} text-xs cursor-grab`}>⋮⋮</span>
+                        <input
+                          type="checkbox"
+                          checked={item.completed}
+                          onChange={() => handleToggleInboxItem(item.id)}
+                          className={`w-4 h-4 rounded ${theme === 'light' ? 'border-gray-400' : 'border-neutral-600'} text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer`}
+                        />
+                        <p className={`text-sm flex-1 ${item.completed ? `line-through ${themeClasses.textMuted}` : ''}`}>
+                          {item.text}
+                        </p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleCopyInboxItem(item)
+                          }}
+                          className={`${themeClasses.textMuted} hover:text-blue-400 text-xs transition-colors`}
+                          title="Copier"
+                        >
+                          📋
+                        </button>
+                        <button
+                          onClick={() => handleRemoveInboxItem(item.id)}
+                          className={`${themeClasses.textMuted} hover:text-red-400 text-xs transition-colors`}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )
+                  })}
                   {inboxItems.length === 0 && (
                     <p className={`text-[11px] ${themeClasses.textMuted} text-center py-4`}>Aucune chose à faire pour le moment</p>
                   )}
