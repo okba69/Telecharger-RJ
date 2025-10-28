@@ -7,6 +7,7 @@ import TaskCoachApp from './TaskCoachApp'
 function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [firebaseConfigured, setFirebaseConfigured] = useState(false)
   const [theme, setTheme] = useState(() => {
     try {
       const saved = localStorage.getItem('theme')
@@ -17,13 +18,24 @@ function App() {
   })
 
   useEffect(() => {
-    // Écouter les changements d'état d'authentification
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser)
-      setLoading(false)
-    })
+    // Vérifier si Firebase est configuré
+    const apiKey = import.meta.env.VITE_FIREBASE_API_KEY
+    const isConfigured = apiKey && apiKey !== 'VOTRE_API_KEY' && !apiKey.includes('votre')
 
-    return () => unsubscribe()
+    setFirebaseConfigured(isConfigured)
+
+    if (isConfigured) {
+      // Firebase configuré: utiliser l'authentification
+      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        setUser(currentUser)
+        setLoading(false)
+      })
+      return () => unsubscribe()
+    } else {
+      // Firebase non configuré: mode localStorage
+      setUser({ isLocalMode: true, displayName: 'Utilisateur Local' })
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -50,13 +62,13 @@ function App() {
     )
   }
 
-  if (!user) {
-    // Utilisateur non connecté: afficher la page de login
+  // Si Firebase est configuré et utilisateur non connecté: afficher la page de login
+  if (firebaseConfigured && !user) {
     return <LoginPage theme={theme} />
   }
 
-  // Utilisateur connecté: afficher l'application
-  return <TaskCoachApp user={user} theme={theme} setTheme={setTheme} />
+  // Sinon: afficher l'application (mode local ou connecté)
+  return <TaskCoachApp user={user} theme={theme} setTheme={setTheme} firebaseConfigured={firebaseConfigured} />
 }
 
 export default App

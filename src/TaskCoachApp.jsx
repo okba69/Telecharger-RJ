@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { signOut } from 'firebase/auth'
 import { auth } from './firebase'
 
-function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme }) {
+function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, firebaseConfigured }) {
   // ========== STATE MANAGEMENT ==========
   const [activeTab, setActiveTab] = useState('today')
 
@@ -818,21 +818,23 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme }) {
         <div className="max-w-[1800px] mx-auto px-6 py-4">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-bold">ProductivityHub</h1>
-            <div className="flex items-center gap-4">
-              <div className={`text-sm ${themeClasses.textSecondary}`}>
-                {user?.displayName || user?.email}
+            {firebaseConfigured && (
+              <div className="flex items-center gap-4">
+                <div className={`text-sm ${themeClasses.textSecondary}`}>
+                  {user?.displayName || user?.email}
+                </div>
+                <button
+                  onClick={() => signOut(auth)}
+                  className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                    theme === 'light'
+                      ? 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                      : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300'
+                  }`}
+                >
+                  Déconnexion
+                </button>
               </div>
-              <button
-                onClick={() => signOut(auth)}
-                className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
-                  theme === 'light'
-                    ? 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                    : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300'
-                }`}
-              >
-                Déconnexion
-              </button>
-            </div>
+            )}
           </div>
 
           {/* Tabs */}
@@ -1565,6 +1567,42 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme }) {
                   </div>
                 </div>
               </div>
+
+              {/* Firebase Status */}
+              {!firebaseConfigured && (
+                <div className={`${themeClasses.bgSecondary} border-2 ${theme === 'light' ? 'border-blue-300 bg-blue-50' : 'border-blue-800 bg-blue-900/20'} rounded-xl p-6`}>
+                  <h3 className="text-lg font-semibold mb-4">🔄 Synchronisation multi-appareils</h3>
+                  <p className={`text-sm ${themeClasses.textSecondary} mb-4`}>
+                    Actuellement, vos données sont stockées <strong>uniquement sur cet appareil</strong> (localStorage).
+                  </p>
+                  <div className={`${theme === 'light' ? 'bg-white' : 'bg-black/30'} rounded-lg p-4 mb-4`}>
+                    <p className="text-sm mb-2"><strong>✨ Activez Firebase pour :</strong></p>
+                    <ul className={`list-disc list-inside space-y-1 text-sm ${themeClasses.textSecondary} ml-4`}>
+                      <li>Accéder à vos données depuis n'importe quel appareil</li>
+                      <li>Synchronisation automatique en temps réel</li>
+                      <li>Sauvegarde cloud sécurisée</li>
+                      <li>Connexion avec votre compte Google</li>
+                    </ul>
+                  </div>
+                  <a
+                    href="https://github.com/okba69/Telecharger-RJ/blob/main/FIREBASE_SETUP.md"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    📖 Guide de configuration Firebase
+                  </a>
+                </div>
+              )}
+
+              {firebaseConfigured && (
+                <div className={`${themeClasses.bgSecondary} border-2 ${theme === 'light' ? 'border-green-300 bg-green-50' : 'border-green-800 bg-green-900/20'} rounded-xl p-6`}>
+                  <h3 className="text-lg font-semibold mb-2">✅ Firebase activé</h3>
+                  <p className={`text-sm ${themeClasses.textSecondary}`}>
+                    Vos données sont synchronisées dans le cloud. Connectez-vous avec le même compte Google sur vos autres appareils pour accéder à vos données.
+                  </p>
+                </div>
+              )}
 
               {/* Future settings placeholder */}
               <div className={`${themeClasses.bgSecondary} border ${themeClasses.border} rounded-xl p-6`}>
