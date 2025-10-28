@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { signOut } from 'firebase/auth'
-import { auth } from './firebase'
-import { useFirestoreSync } from './hooks/useFirestoreSync'
+import { supabase } from './supabase'
+import { useSupabaseSync } from './hooks/useSupabaseSync'
 
-function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, firebaseConfigured }) {
+function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, supabaseConfigured }) {
   // ========== STATE MANAGEMENT ==========
   const [activeTab, setActiveTab] = useState('today')
 
@@ -93,16 +92,16 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, fir
     "⚔️ Warrior mode : ACTIVÉ !"
   ]
 
-  // ========== FIRESTORE SYNCHRONIZATION ==========
-  // Synchroniser toutes les données avec Firestore (ou localStorage si Firebase non configuré)
-  useFirestoreSync(user, firebaseConfigured, tasks, setTasks, 'tasks')
-  useFirestoreSync(user, firebaseConfigured, inboxItems, setInboxItems, 'inboxItems')
-  useFirestoreSync(user, firebaseConfigured, dailyFeedback, (value) => setDailyFeedback(value), 'dailyFeedback')
-  useFirestoreSync(user, firebaseConfigured, energyLevel, setEnergyLevel, 'energyLevel')
-  useFirestoreSync(user, firebaseConfigured, satisfactionLevel, setSatisfactionLevel, 'satisfactionLevel')
-  useFirestoreSync(user, firebaseConfigured, history, setHistory, 'history')
-  useFirestoreSync(user, firebaseConfigured, currentDate, (value) => setCurrentDate(value), 'currentDate')
-  useFirestoreSync(user, firebaseConfigured, taskHistory, setTaskHistory, 'taskHistory')
+  // ========== SUPABASE SYNCHRONIZATION ==========
+  // Synchroniser toutes les données avec Supabase (ou localStorage si Supabase non configuré)
+  useSupabaseSync(user, supabaseConfigured, tasks, setTasks, 'tasks')
+  useSupabaseSync(user, supabaseConfigured, inboxItems, setInboxItems, 'inboxItems')
+  useSupabaseSync(user, supabaseConfigured, dailyFeedback, (value) => setDailyFeedback(value), 'dailyFeedback')
+  useSupabaseSync(user, supabaseConfigured, energyLevel, setEnergyLevel, 'energyLevel')
+  useSupabaseSync(user, supabaseConfigured, satisfactionLevel, setSatisfactionLevel, 'satisfactionLevel')
+  useSupabaseSync(user, supabaseConfigured, history, setHistory, 'history')
+  useSupabaseSync(user, supabaseConfigured, currentDate, (value) => setCurrentDate(value), 'currentDate')
+  useSupabaseSync(user, supabaseConfigured, taskHistory, setTaskHistory, 'taskHistory')
 
   // ========== TIMER LOGIC ==========
   useEffect(() => {
@@ -797,13 +796,13 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, fir
         <div className="max-w-[1800px] mx-auto px-6 py-4">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-bold">ProductivityHub</h1>
-            {firebaseConfigured && (
+            {supabaseConfigured && (
               <div className="flex items-center gap-4">
                 <div className={`text-sm ${themeClasses.textSecondary}`}>
                   {user?.displayName || user?.email}
                 </div>
                 <button
-                  onClick={() => signOut(auth)}
+                  onClick={() => supabase.auth.signOut()}
                   className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
                     theme === 'light'
                       ? 'bg-gray-200 hover:bg-gray-300 text-gray-700'
@@ -1548,7 +1547,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, fir
               </div>
 
               {/* Firebase Status */}
-              {!firebaseConfigured && (
+              {!supabaseConfigured && (
                 <div className={`${themeClasses.bgSecondary} border-2 ${theme === 'light' ? 'border-blue-300 bg-blue-50' : 'border-blue-800 bg-blue-900/20'} rounded-xl p-6`}>
                   <h3 className="text-lg font-semibold mb-4">🔄 Synchronisation multi-appareils</h3>
                   <p className={`text-sm ${themeClasses.textSecondary} mb-4`}>
@@ -1564,7 +1563,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, fir
                     </ul>
                   </div>
                   <a
-                    href="https://github.com/okba69/Telecharger-RJ/blob/main/FIREBASE_SETUP.md"
+                    href="https://github.com/okba69/Telecharger-RJ/blob/main/SUPABASE_SETUP.md"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -1574,7 +1573,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, fir
                 </div>
               )}
 
-              {firebaseConfigured && (
+              {supabaseConfigured && (
                 <div className={`${themeClasses.bgSecondary} border-2 ${theme === 'light' ? 'border-green-300 bg-green-50' : 'border-green-800 bg-green-900/20'} rounded-xl p-6`}>
                   <h3 className="text-lg font-semibold mb-2">✅ Firebase activé</h3>
                   <p className={`text-sm ${themeClasses.textSecondary}`}>
