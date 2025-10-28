@@ -633,13 +633,8 @@ function TaskCoachApp() {
   }
 
   const handleCopyInboxItem = (item) => {
-    const copiedItem = {
-      id: Date.now(),
-      text: item.text,
-      completed: false,
-      category: item.category || 'travail'
-    }
-    setInboxItems([...inboxItems, copiedItem])
+    setNewInboxItem(item.text)
+    setInboxCategory(item.category || 'travail')
   }
 
   // Drag and drop for inbox
@@ -820,32 +815,32 @@ function TaskCoachApp() {
               <div className={`${themeClasses.card} border rounded-2xl p-6`}>
                 <h2 className="text-lg font-semibold mb-4">✅ À faire</h2>
 
-                {/* Category Selector */}
-                <div className="flex gap-2 mb-4">
+                {/* Category Selector - Smaller and more subtle */}
+                <div className="flex gap-1.5 mb-3">
                   <button
                     onClick={() => setInboxCategory('travail')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
                       inboxCategory === 'travail'
                         ? theme === 'light'
-                          ? 'bg-blue-100 text-blue-800 border-2 border-blue-300'
-                          : 'bg-blue-900/30 text-blue-300 border-2 border-blue-700'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'bg-blue-900/20 text-blue-400 border border-blue-800/50'
                         : theme === 'light'
-                        ? 'bg-gray-100 text-gray-600 border-2 border-gray-200'
-                        : 'bg-neutral-800 text-neutral-400 border-2 border-neutral-700'
+                        ? 'bg-gray-50 text-gray-500 border border-gray-200'
+                        : 'bg-neutral-800/50 text-neutral-500 border border-neutral-700/50'
                     }`}
                   >
                     💼 Travail
                   </button>
                   <button
                     onClick={() => setInboxCategory('ecole')}
-                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-all ${
                       inboxCategory === 'ecole'
                         ? theme === 'light'
-                          ? 'bg-purple-100 text-purple-800 border-2 border-purple-300'
-                          : 'bg-purple-900/30 text-purple-300 border-2 border-purple-700'
+                          ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                          : 'bg-purple-900/20 text-purple-400 border border-purple-800/50'
                         : theme === 'light'
-                        ? 'bg-gray-100 text-gray-600 border-2 border-gray-200'
-                        : 'bg-neutral-800 text-neutral-400 border-2 border-neutral-700'
+                        ? 'bg-gray-50 text-gray-500 border border-gray-200'
+                        : 'bg-neutral-800/50 text-neutral-500 border border-neutral-700/50'
                     }`}
                   >
                     🎓 École
@@ -871,58 +866,72 @@ function TaskCoachApp() {
                   </div>
                 </form>
 
-                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                  {inboxItems.map(item => {
-                    const category = item.category || 'travail'
-                    const categoryColors = category === 'ecole'
-                      ? theme === 'light'
-                        ? 'bg-purple-50 border-purple-200'
-                        : 'bg-purple-900/10 border-purple-800/30'
-                      : theme === 'light'
-                      ? 'bg-blue-50 border-blue-200'
-                      : 'bg-blue-900/10 border-blue-800/30'
+                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  {inboxItems
+                    .sort((a, b) => {
+                      // First sort by completed status (uncompleted first)
+                      if (a.completed !== b.completed) {
+                        return a.completed ? 1 : -1
+                      }
+                      // Then sort by category (travail first, then école)
+                      const catA = a.category || 'travail'
+                      const catB = b.category || 'travail'
+                      if (catA !== catB) {
+                        return catA === 'travail' ? -1 : 1
+                      }
+                      return 0
+                    })
+                    .map(item => {
+                      const category = item.category || 'travail'
+                      const categoryColors = category === 'ecole'
+                        ? theme === 'light'
+                          ? 'bg-purple-50/50 border-purple-100'
+                          : 'bg-purple-900/5 border-purple-900/20'
+                        : theme === 'light'
+                        ? 'bg-blue-50/50 border-blue-100'
+                        : 'bg-blue-900/5 border-blue-900/20'
 
-                    return (
-                      <div
-                        key={item.id}
-                        draggable
-                        onDragStart={(e) => handleInboxDragStart(e, item)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleInboxDrop(e, item)}
-                        onDragEnd={handleInboxDragEnd}
-                        className={`${categoryColors} border rounded-lg p-3 flex items-center gap-3 cursor-move transition-all ${
-                          draggedInboxItem?.id === item.id ? 'opacity-50' : ''
-                        }`}
-                      >
-                        <span className={`${themeClasses.textMuted} text-xs cursor-grab`}>⋮⋮</span>
-                        <input
-                          type="checkbox"
-                          checked={item.completed}
-                          onChange={() => handleToggleInboxItem(item.id)}
-                          className={`w-4 h-4 rounded ${theme === 'light' ? 'border-gray-400' : 'border-neutral-600'} text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer`}
-                        />
-                        <p className={`text-sm flex-1 ${item.completed ? `line-through ${themeClasses.textMuted}` : ''}`}>
-                          {item.text}
-                        </p>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleCopyInboxItem(item)
-                          }}
-                          className={`${themeClasses.textMuted} hover:text-blue-400 text-xs transition-colors`}
-                          title="Copier"
+                      return (
+                        <div
+                          key={item.id}
+                          draggable
+                          onDragStart={(e) => handleInboxDragStart(e, item)}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleInboxDrop(e, item)}
+                          onDragEnd={handleInboxDragEnd}
+                          className={`${categoryColors} border rounded-lg p-3 flex items-center gap-3 cursor-move transition-all ${
+                            draggedInboxItem?.id === item.id ? 'opacity-50' : ''
+                          }`}
                         >
-                          📋
-                        </button>
-                        <button
-                          onClick={() => handleRemoveInboxItem(item.id)}
-                          className={`${themeClasses.textMuted} hover:text-red-400 text-xs transition-colors`}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    )
-                  })}
+                          <span className={`${themeClasses.textMuted} text-xs cursor-grab`}>⋮⋮</span>
+                          <input
+                            type="checkbox"
+                            checked={item.completed}
+                            onChange={() => handleToggleInboxItem(item.id)}
+                            className={`w-4 h-4 rounded ${theme === 'light' ? 'border-gray-400' : 'border-neutral-600'} text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer`}
+                          />
+                          <p className={`text-sm flex-1 ${item.completed ? `line-through ${themeClasses.textMuted}` : ''}`}>
+                            {item.text}
+                          </p>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleCopyInboxItem(item)
+                            }}
+                            className={`${themeClasses.textMuted} hover:text-blue-400 text-xs transition-colors`}
+                            title="Copier dans le champ"
+                          >
+                            📋
+                          </button>
+                          <button
+                            onClick={() => handleRemoveInboxItem(item.id)}
+                            className={`${themeClasses.textMuted} hover:text-red-400 text-xs transition-colors`}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )
+                    })}
                   {inboxItems.length === 0 && (
                     <p className={`text-[11px] ${themeClasses.textMuted} text-center py-4`}>Aucune chose à faire pour le moment</p>
                   )}
