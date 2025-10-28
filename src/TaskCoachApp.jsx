@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
+import { signOut } from 'firebase/auth'
+import { auth } from './firebase'
 
-function TaskCoachApp() {
+function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme }) {
   // ========== STATE MANAGEMENT ==========
   const [activeTab, setActiveTab] = useState('today')
 
@@ -46,8 +48,9 @@ function TaskCoachApp() {
   // Task history (all tasks ever created)
   const [taskHistory, setTaskHistory] = useState(() => loadFromStorage('taskHistory', []))
 
-  // Theme
-  const [theme, setTheme] = useState(() => loadFromStorage('theme', 'dark'))
+  // Theme (from parent props)
+  const theme = initialTheme
+  const setTheme = setParentTheme
 
   // Focus mode & Pomodoro
   const [isFocusMode, setIsFocusMode] = useState(false)
@@ -121,10 +124,6 @@ function TaskCoachApp() {
   useEffect(() => {
     localStorage.setItem('taskHistory', JSON.stringify(taskHistory))
   }, [taskHistory])
-
-  useEffect(() => {
-    localStorage.setItem('theme', JSON.stringify(theme))
-  }, [theme])
 
   // ========== TIMER LOGIC ==========
   useEffect(() => {
@@ -817,7 +816,24 @@ function TaskCoachApp() {
       {/* Header */}
       <header className={`border-b ${themeClasses.header}`}>
         <div className="max-w-[1800px] mx-auto px-6 py-4">
-          <h1 className="text-2xl font-bold mb-4">ProductivityHub</h1>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold">ProductivityHub</h1>
+            <div className="flex items-center gap-4">
+              <div className={`text-sm ${themeClasses.textSecondary}`}>
+                {user?.displayName || user?.email}
+              </div>
+              <button
+                onClick={() => signOut(auth)}
+                className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                  theme === 'light'
+                    ? 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                    : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300'
+                }`}
+              >
+                Déconnexion
+              </button>
+            </div>
+          </div>
 
           {/* Tabs */}
           <nav className="flex gap-2">
