@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { signOut } from 'firebase/auth'
 import { auth } from './firebase'
+import { useFirestoreSync } from './hooks/useFirestoreSync'
 
 function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, firebaseConfigured }) {
   // ========== STATE MANAGEMENT ==========
@@ -92,38 +93,16 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, fir
     "⚔️ Warrior mode : ACTIVÉ !"
   ]
 
-  // ========== PERSISTENCE ==========
-  useEffect(() => {
-    localStorage.setItem('tasks', JSON.stringify(tasks))
-  }, [tasks])
-
-  useEffect(() => {
-    localStorage.setItem('inboxItems', JSON.stringify(inboxItems))
-  }, [inboxItems])
-
-  useEffect(() => {
-    localStorage.setItem('dailyFeedback', dailyFeedback)
-  }, [dailyFeedback])
-
-  useEffect(() => {
-    localStorage.setItem('energyLevel', JSON.stringify(energyLevel))
-  }, [energyLevel])
-
-  useEffect(() => {
-    localStorage.setItem('satisfactionLevel', JSON.stringify(satisfactionLevel))
-  }, [satisfactionLevel])
-
-  useEffect(() => {
-    localStorage.setItem('history', JSON.stringify(history))
-  }, [history])
-
-  useEffect(() => {
-    localStorage.setItem('currentDate', currentDate)
-  }, [currentDate])
-
-  useEffect(() => {
-    localStorage.setItem('taskHistory', JSON.stringify(taskHistory))
-  }, [taskHistory])
+  // ========== FIRESTORE SYNCHRONIZATION ==========
+  // Synchroniser toutes les données avec Firestore (ou localStorage si Firebase non configuré)
+  useFirestoreSync(user, firebaseConfigured, tasks, setTasks, 'tasks')
+  useFirestoreSync(user, firebaseConfigured, inboxItems, setInboxItems, 'inboxItems')
+  useFirestoreSync(user, firebaseConfigured, dailyFeedback, (value) => setDailyFeedback(value), 'dailyFeedback')
+  useFirestoreSync(user, firebaseConfigured, energyLevel, setEnergyLevel, 'energyLevel')
+  useFirestoreSync(user, firebaseConfigured, satisfactionLevel, setSatisfactionLevel, 'satisfactionLevel')
+  useFirestoreSync(user, firebaseConfigured, history, setHistory, 'history')
+  useFirestoreSync(user, firebaseConfigured, currentDate, (value) => setCurrentDate(value), 'currentDate')
+  useFirestoreSync(user, firebaseConfigured, taskHistory, setTaskHistory, 'taskHistory')
 
   // ========== TIMER LOGIC ==========
   useEffect(() => {
