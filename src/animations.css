@@ -151,21 +151,15 @@
   animation: breathe 4s ease-in-out infinite;
 }
 
-/* Star particles */
-@keyframes star-twinkle {
-  0%, 100% {
-    opacity: 0.3;
-    transform: scale(1);
+/* Peaceful gradient shift animation for focus mode */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
   }
   50% {
-    opacity: 1;
-    transform: scale(1.5);
+    background-position: 100% 50%;
   }
-}
-
-.star {
-  position: absolute;
-  background: white;
-  border-radius: 50%;
-  animation: star-twinkle 2s ease-in-out infinite;
+  100% {
+    background-position: 0% 50%;
+  }
 }

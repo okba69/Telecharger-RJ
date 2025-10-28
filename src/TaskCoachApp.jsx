@@ -676,6 +676,11 @@ function TaskCoachApp() {
         setPomodoroSeconds(25 * 60)
         setIsPomodoroRunning(true)
         pomodoroTickRef.current = Date.now()
+
+        // Start task timer automatically
+        setIsRunning(true)
+        lastTickRef.current = Date.now()
+
         const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
         setMotivationalMessage(randomMsg)
       }, 1500)
@@ -683,6 +688,37 @@ function TaskCoachApp() {
       // Stopping focus mode
       setIsFocusMode(false)
       setIsPomodoroRunning(false)
+    }
+  }
+
+  const handleUnifiedPausePlay = () => {
+    const newRunningState = !isRunning
+
+    // Toggle task timer
+    setIsRunning(newRunningState)
+    if (newRunningState) {
+      lastTickRef.current = Date.now()
+      if (activeTaskId) {
+        setTasks(prevTasks =>
+          prevTasks.map(t =>
+            t.id === activeTaskId ? { ...t, status: 'doing' } : t
+          )
+        )
+      }
+    } else {
+      if (activeTaskId) {
+        setTasks(prevTasks =>
+          prevTasks.map(t =>
+            t.id === activeTaskId ? { ...t, status: 'paused' } : t
+          )
+        )
+      }
+    }
+
+    // Toggle pomodoro timer
+    setIsPomodoroRunning(newRunningState)
+    if (newRunningState) {
+      pomodoroTickRef.current = Date.now()
     }
   }
 
@@ -1005,22 +1041,7 @@ function TaskCoachApp() {
             <div className="space-y-6">
               {/* Task List */}
               <div className={`${themeClasses.card} border rounded-2xl p-6`}>
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-lg font-semibold">📋 Mes tâches</h2>
-                  <button
-                    onClick={toggleFocusMode}
-                    disabled={!activeTaskId}
-                    className={`text-xs rounded-lg px-3 py-1 transition-colors ${
-                      activeTaskId
-                        ? 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer'
-                        : theme === 'light'
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-neutral-700 text-neutral-500 cursor-not-allowed'
-                    }`}
-                  >
-                    🎯 Mode Focus
-                  </button>
-                </div>
+                <h2 className="text-lg font-semibold mb-4">📋 Mes tâches</h2>
 
                 <div className="space-y-2">
                   {tasks.length === 0 ? (
@@ -1101,14 +1122,24 @@ function TaskCoachApp() {
                     <h2 className="text-lg font-semibold">
                       {isFocusMode ? '🎯 Mode Focus' : '⏱️ Tâche active'}
                     </h2>
-                    {isFocusMode && (
-                      <button
-                        onClick={toggleFocusMode}
-                        className="text-xs text-neutral-400 hover:text-neutral-200 transition-colors"
-                      >
-                        ✕ Quitter
-                      </button>
-                    )}
+                    <div className="flex gap-2">
+                      {!isFocusMode && (
+                        <button
+                          onClick={toggleFocusMode}
+                          className="text-xs rounded-lg px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white cursor-pointer transition-colors"
+                        >
+                          🎯 Mode Focus
+                        </button>
+                      )}
+                      {isFocusMode && (
+                        <button
+                          onClick={toggleFocusMode}
+                          className="text-xs text-neutral-400 hover:text-neutral-200 transition-colors"
+                        >
+                          ✕ Quitter
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Pomodoro Timer (only in focus mode) */}
@@ -1539,24 +1570,17 @@ function TaskCoachApp() {
 
       {/* Fullscreen Focus Mode */}
       {isFocusMode && (
-        <div className="fixed inset-0 z-50 bg-gradient-to-br from-indigo-950 via-purple-950 to-pink-950 flex items-center justify-center p-8 animate-fade-in">
-          {/* Background stars */}
-          <div className="absolute inset-0 overflow-hidden">
-            {[...Array(20)].map((_, i) => (
-              <div
-                key={i}
-                className="star"
-                style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `${Math.random() * 100}%`,
-                  width: `${2 + Math.random() * 4}px`,
-                  height: `${2 + Math.random() * 4}px`,
-                  animationDelay: `${Math.random() * 2}s`,
-                  animationDuration: `${2 + Math.random() * 2}s`
-                }}
-              />
-            ))}
-          </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-8 animate-fade-in" style={{
+          background: 'linear-gradient(135deg, #1e1b4b, #312e81, #4c1d95, #5b21b6)',
+          backgroundSize: '400% 400%',
+          animation: 'gradientShift 15s ease infinite'
+        }}>
+          {/* Animated gradient overlay */}
+          <div className="absolute inset-0" style={{
+            background: 'radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.15), transparent 50%)',
+            backgroundSize: '200% 200%',
+            animation: 'pulse 8s ease-in-out infinite'
+          }} />
 
           {/* Close button */}
           <button
@@ -1683,10 +1707,10 @@ function TaskCoachApp() {
                   {/* Controls */}
                   <div className="flex gap-2">
                     <button
-                      onClick={handlePomodoroToggle}
+                      onClick={handleUnifiedPausePlay}
                       className="flex-1 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg text-white text-sm font-semibold transition-all"
                     >
-                      {isPomodoroRunning ? '⏸️ Pause' : '▶️ Start'}
+                      {isRunning ? '⏸️ Pause Tout' : '▶️ Lancer Tout'}
                     </button>
                     <button
                       onClick={handlePomodoroReset}
