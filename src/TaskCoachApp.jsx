@@ -849,7 +849,14 @@ function TaskCoachApp() {
             <div className="space-y-6">
               {/* À faire (Inbox with checkbox) */}
               <div className={`${themeClasses.card} border rounded-2xl p-6`}>
-                <h2 className="text-lg font-semibold mb-4">✅ À faire</h2>
+                <h2 className="text-lg font-semibold mb-4">
+                  ✅ À faire
+                  {inboxItems.length > 0 && (
+                    <span className={`ml-2 text-sm font-normal ${themeClasses.textMuted}`}>
+                      ({inboxItems.filter(item => !item.completed).length}/{inboxItems.length})
+                    </span>
+                  )}
+                </h2>
 
                 {/* Category Selector - Smaller and more subtle */}
                 <div className="flex gap-1.5 mb-3">
