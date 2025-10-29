@@ -105,22 +105,23 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   useSupabaseSync(user, supabaseConfigured, taskHistory, setTaskHistory, 'taskHistory')
 
   // ========== TIMER LOGIC ==========
-  // Initialize base seconds when task changes
-  useEffect(() => {
-    if (activeTaskId !== null) {
-      const task = tasks.find(t => t.id === activeTaskId)
-      if (task) {
-        baseSecondsRef.current = task.secondsSpent
-      }
-    }
-  }, [activeTaskId, tasks])
-
   // Main timer loop with precise timing
   useEffect(() => {
     if (!isRunning || activeTaskId === null) return
 
+    // Safety check: ensure refs are initialized
+    if (startTimeRef.current === null) {
+      const task = tasks.find(t => t.id === activeTaskId)
+      if (task) {
+        baseSecondsRef.current = task.secondsSpent
+        startTimeRef.current = Date.now()
+      }
+    }
+
     // Update every 100ms for smooth display, but only increment seconds properly
     const interval = setInterval(() => {
+      if (startTimeRef.current === null) return // Safety check
+
       const now = Date.now()
       const elapsedMs = now - startTimeRef.current
       const totalSeconds = baseSecondsRef.current + Math.floor(elapsedMs / 1000)
@@ -135,7 +136,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
     }, 100) // Update every 100ms for smooth display
 
     return () => clearInterval(interval)
-  }, [isRunning, activeTaskId])
+  }, [isRunning, activeTaskId, tasks])
 
   // ========== POMODORO TIMER ==========
   useEffect(() => {
@@ -420,6 +421,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
 
   const handlePause = () => {
     setIsRunning(false)
+    startTimeRef.current = null // Reset timing refs when pausing
     if (activeTaskId) {
       setTasks(prevTasks =>
         prevTasks.map(t =>
@@ -464,6 +466,8 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
       )
     )
     setIsRunning(false)
+    startTimeRef.current = null // Reset timing refs
+    baseSecondsRef.current = 0
     setActiveTaskId(null)
     triggerConfetti()
     playNotificationSound()
@@ -685,9 +689,10 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
         setMotivationalMessage(randomMsg)
       }, 1500)
     } else {
-      // Stopping focus mode
+      // Stopping focus mode - keep timer running if it was running
       setIsFocusMode(false)
       setIsPomodoroRunning(false)
+      // Don't reset timer refs here - let the timer continue if it was running
     }
   }
 
@@ -710,7 +715,8 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
         )
       }
     } else {
-      // Pausing
+      // Pausing - reset timing refs
+      startTimeRef.current = null
       if (activeTaskId) {
         setTasks(prevTasks =>
           prevTasks.map(t =>
