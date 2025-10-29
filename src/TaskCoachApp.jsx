@@ -22,7 +22,8 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   // Active task tracking
   const [activeTaskId, setActiveTaskId] = useState(null)
   const [isRunning, setIsRunning] = useState(false)
-  const lastTickRef = useRef(Date.now())
+  const startTimeRef = useRef(null) // Absolute start time for current running session
+  const baseSecondsRef = useRef(0) // Accumulated seconds before current session
 
   // Inbox (renamed to "À faire")
   const [inboxItems, setInboxItems] = useState(() => loadFromStorage('inboxItems', []))
@@ -104,24 +105,34 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   useSupabaseSync(user, supabaseConfigured, taskHistory, setTaskHistory, 'taskHistory')
 
   // ========== TIMER LOGIC ==========
+  // Initialize base seconds when task changes
+  useEffect(() => {
+    if (activeTaskId !== null) {
+      const task = tasks.find(t => t.id === activeTaskId)
+      if (task) {
+        baseSecondsRef.current = task.secondsSpent
+      }
+    }
+  }, [activeTaskId, tasks])
+
+  // Main timer loop with precise timing
   useEffect(() => {
     if (!isRunning || activeTaskId === null) return
 
+    // Update every 100ms for smooth display, but only increment seconds properly
     const interval = setInterval(() => {
       const now = Date.now()
-      const deltaSeconds = Math.floor((now - lastTickRef.current) / 1000)
+      const elapsedMs = now - startTimeRef.current
+      const totalSeconds = baseSecondsRef.current + Math.floor(elapsedMs / 1000)
 
-      if (deltaSeconds >= 1) {
-        setTasks(prevTasks =>
-          prevTasks.map(task =>
-            task.id === activeTaskId
-              ? { ...task, secondsSpent: task.secondsSpent + deltaSeconds }
-              : task
-          )
+      setTasks(prevTasks =>
+        prevTasks.map(task =>
+          task.id === activeTaskId
+            ? { ...task, secondsSpent: totalSeconds }
+            : task
         )
-        lastTickRef.current = now
-      }
-    }, 1000)
+      )
+    }, 100) // Update every 100ms for smooth display
 
     return () => clearInterval(interval)
   }, [isRunning, activeTaskId])
@@ -419,8 +430,16 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   }
 
   const handleResume = () => {
+    if (activeTaskId) {
+      const task = tasks.find(t => t.id === activeTaskId)
+      if (task) {
+        baseSecondsRef.current = task.secondsSpent
+        startTimeRef.current = Date.now()
+      }
+    }
+
     setIsRunning(true)
-    lastTickRef.current = Date.now()
+
     if (activeTaskId) {
       // Set active task to 'doing' and all others that were 'doing' to 'paused'
       setTasks(prevTasks =>
@@ -654,9 +673,13 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
         setIsPomodoroRunning(true)
         pomodoroTickRef.current = Date.now()
 
-        // Start task timer automatically
+        // Start task timer automatically - initialize timing refs
+        const task = tasks.find(t => t.id === activeTaskId)
+        if (task) {
+          baseSecondsRef.current = task.secondsSpent
+          startTimeRef.current = Date.now()
+        }
         setIsRunning(true)
-        lastTickRef.current = Date.now()
 
         const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
         setMotivationalMessage(randomMsg)
@@ -672,10 +695,14 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
     const newRunningState = !isRunning
 
     // Toggle task timer
-    setIsRunning(newRunningState)
     if (newRunningState) {
-      lastTickRef.current = Date.now()
+      // Starting - initialize timing refs
       if (activeTaskId) {
+        const task = tasks.find(t => t.id === activeTaskId)
+        if (task) {
+          baseSecondsRef.current = task.secondsSpent
+          startTimeRef.current = Date.now()
+        }
         setTasks(prevTasks =>
           prevTasks.map(t =>
             t.id === activeTaskId ? { ...t, status: 'doing' } : t
@@ -683,6 +710,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
         )
       }
     } else {
+      // Pausing
       if (activeTaskId) {
         setTasks(prevTasks =>
           prevTasks.map(t =>
@@ -691,6 +719,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
         )
       }
     }
+    setIsRunning(newRunningState)
 
     // Toggle pomodoro timer
     setIsPomodoroRunning(newRunningState)
