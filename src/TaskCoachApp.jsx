@@ -1081,13 +1081,26 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
               <div className={`${themeClasses.card} border rounded-2xl p-6`}>
                 <h2 className="text-lg font-semibold mb-4">📋 Mes tâches</h2>
 
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[420px] overflow-y-auto pr-2">
                   {tasks.length === 0 ? (
                     <p className={`text-[11px] ${themeClasses.textMuted} text-center py-8`}>
                       Aucune tâche. Créez-en une pour commencer !
                     </p>
                   ) : (
-                    tasks.map(task => (
+                    [...tasks]
+                      .sort((a, b) => {
+                        // Active task always first
+                        if (a.id === activeTaskId) return -1
+                        if (b.id === activeTaskId) return 1
+
+                        // Done tasks always last
+                        if (a.status === 'done' && b.status !== 'done') return 1
+                        if (a.status !== 'done' && b.status === 'done') return -1
+
+                        // Keep original order for same priority
+                        return 0
+                      })
+                      .map(task => (
                       <div
                         key={task.id}
                         draggable
