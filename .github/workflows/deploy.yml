@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - claude/create-work-tracker-app-011CUXpofJRmNxz6m5VgzaUF
+      - claude/resume-professional-work-011CUbkhfzVBz5ECCAc8pvAA
 
 permissions:
   contents: read
