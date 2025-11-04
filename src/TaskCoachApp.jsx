@@ -29,6 +29,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   const [inboxItems, setInboxItems] = useState(() => loadFromStorage('inboxItems', []))
   const [newInboxItem, setNewInboxItem] = useState('')
   const [inboxCategory, setInboxCategory] = useState('travail') // 'travail' or 'ecole'
+  const [inboxDeadline, setInboxDeadline] = useState('') // Date deadline for inbox items
 
   // New task form
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -609,9 +610,11 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
       id: Date.now(),
       text: newInboxItem,
       completed: false,
-      category: inboxCategory
+      category: inboxCategory,
+      deadline: inboxDeadline || null // Add deadline if provided
     }])
     setNewInboxItem('')
+    setInboxDeadline('') // Reset deadline after adding
   }
 
   const handleToggleInboxItem = (id) => {
@@ -921,15 +924,20 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                   </button>
                 </div>
 
-                <form onSubmit={handleAddInboxItem} className="mb-4">
+                <form onSubmit={handleAddInboxItem} className="mb-4 space-y-2">
+                  <input
+                    type="text"
+                    value={newInboxItem}
+                    onChange={(e) => setNewInboxItem(e.target.value)}
+                    placeholder="Ajouter une chose à faire..."
+                    className={`w-full ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  />
                   <div className="flex gap-2">
                     <input
-                      type="text"
-                      value={newInboxItem}
-                      onChange={(e) => setNewInboxItem(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddInboxItem(e)}
-                      placeholder="Ajouter une chose à faire..."
-                      className={`flex-1 ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      type="date"
+                      value={inboxDeadline}
+                      onChange={(e) => setInboxDeadline(e.target.value)}
+                      className={`flex-1 ${themeClasses.input} rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     />
                     <button
                       type="submit"
@@ -947,6 +955,18 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                       if (a.completed !== b.completed) {
                         return a.completed ? 1 : -1
                       }
+
+                      // Then sort by deadline (items with deadline first, sorted by date)
+                      const hasDeadlineA = !!a.deadline
+                      const hasDeadlineB = !!b.deadline
+
+                      if (hasDeadlineA && !hasDeadlineB) return -1
+                      if (!hasDeadlineA && hasDeadlineB) return 1
+
+                      if (hasDeadlineA && hasDeadlineB) {
+                        return new Date(a.deadline) - new Date(b.deadline)
+                      }
+
                       // Then sort by category (travail first, then école)
                       const catA = a.category || 'travail'
                       const catB = b.category || 'travail'
@@ -964,6 +984,31 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                         : theme === 'light'
                         ? 'bg-blue-50/50 border-blue-100'
                         : 'bg-blue-900/5 border-blue-900/20'
+
+                      // Calculate deadline status
+                      let deadlineColor = ''
+                      let deadlineText = ''
+                      if (item.deadline) {
+                        const today = new Date()
+                        today.setHours(0, 0, 0, 0)
+                        const deadlineDate = new Date(item.deadline)
+                        const diffTime = deadlineDate - today
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+                        if (diffDays < 0) {
+                          deadlineColor = 'text-red-600 font-semibold'
+                          deadlineText = '🔴'
+                        } else if (diffDays === 0) {
+                          deadlineColor = 'text-orange-600 font-semibold'
+                          deadlineText = '🟠'
+                        } else if (diffDays <= 2) {
+                          deadlineColor = 'text-orange-500'
+                          deadlineText = '🟡'
+                        } else {
+                          deadlineColor = themeClasses.textMuted
+                          deadlineText = '📅'
+                        }
+                      }
 
                       return (
                         <div
@@ -984,9 +1029,16 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                             onChange={() => handleToggleInboxItem(item.id)}
                             className={`w-4 h-4 rounded ${theme === 'light' ? 'border-gray-400' : 'border-neutral-600'} text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer`}
                           />
-                          <p className={`text-sm flex-1 ${item.completed ? `line-through ${themeClasses.textMuted}` : ''}`}>
-                            {item.text}
-                          </p>
+                          <div className="flex-1">
+                            <p className={`text-sm ${item.completed ? `line-through ${themeClasses.textMuted}` : ''}`}>
+                              {item.text}
+                            </p>
+                            {item.deadline && (
+                              <p className={`text-[10px] ${deadlineColor} mt-1`}>
+                                {deadlineText} {new Date(item.deadline).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                              </p>
+                            )}
+                          </div>
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
