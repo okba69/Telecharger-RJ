@@ -122,6 +122,17 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   useSupabaseSync(user, supabaseConfigured, pomodoroConfig, setPomodoroConfig, 'pomodoroConfig')
   useSupabaseSync(user, supabaseConfigured, missions, setMissions, 'missions')
 
+  // Migrate existing missions to add category field (backward compatibility)
+  useEffect(() => {
+    const needsMigration = missions.some(m => !m.category)
+    if (needsMigration) {
+      setMissions(missions.map(m => ({
+        ...m,
+        category: m.category || 'work'
+      })))
+    }
+  }, []) // Only run once on mount
+
   // ========== TIMER LOGIC ==========
   // Main timer loop with precise timing
   useEffect(() => {
@@ -919,7 +930,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
       {/* Main Content */}
       <main className="max-w-[1800px] mx-auto px-6 py-6">
         {activeTab === 'today' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* ========== COLUMN A: PLANIFIER ========== */}
             <div className="space-y-6">
               {/* À faire (Inbox with checkbox) */}
@@ -1176,231 +1187,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
               </div>
             </div>
 
-            {/* ========== COLUMN B: EXÉCUTER ========== */}
-            <div className="space-y-6">
-              {/* Task List */}
-              <div className={`${themeClasses.card} border rounded-2xl p-6`}>
-                <h2 className="text-lg font-semibold mb-4">📋 Mes tâches</h2>
-
-                <div className="space-y-2 max-h-[420px] overflow-y-auto pr-2">
-                  {tasks.length === 0 ? (
-                    <p className={`text-[11px] ${themeClasses.textMuted} text-center py-8`}>
-                      Aucune tâche. Créez-en une pour commencer !
-                    </p>
-                  ) : (
-                    [...tasks]
-                      .sort((a, b) => {
-                        // Active task always first
-                        if (a.id === activeTaskId) return -1
-                        if (b.id === activeTaskId) return 1
-
-                        // Done tasks always last
-                        if (a.status === 'done' && b.status !== 'done') return 1
-                        if (a.status !== 'done' && b.status === 'done') return -1
-
-                        // Keep original order for same priority
-                        return 0
-                      })
-                      .map(task => (
-                      <div
-                        key={task.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, task)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, task)}
-                        onDragEnd={handleDragEnd}
-                        onClick={() => task.status !== 'done' && handleTaskClick(task.id)}
-                        className={`border rounded-lg p-4 cursor-move transition-all ${
-                          task.id === activeTaskId
-                            ? themeClasses.taskCardActive
-                            : task.status === 'done'
-                            ? `${themeClasses.taskCardDone} opacity-60`
-                            : themeClasses.taskCard
-                        } ${draggedTask?.id === task.id ? 'opacity-50' : ''}`}
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex items-center gap-2 flex-1">
-                            <span className={`${themeClasses.textMuted} text-xs cursor-grab`}>⋮⋮</span>
-                            <h3 className="text-sm font-semibold flex-1">{task.title}</h3>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[10px] px-2 py-1 rounded ${
-                              task.status === 'todo' ? (theme === 'light' ? 'bg-gray-300 text-gray-700' : 'bg-neutral-700 text-neutral-300') :
-                              task.status === 'doing' ? 'bg-blue-700 text-blue-200' :
-                              task.status === 'paused' ? 'bg-yellow-700 text-yellow-200' :
-                              'bg-green-700 text-green-200'
-                            }`}>
-                              {task.status === 'todo' ? 'À faire' :
-                               task.status === 'doing' ? 'En cours' :
-                               task.status === 'paused' ? 'En pause' :
-                               'Terminé'}
-                            </span>
-                            {task.status === 'done' && (
-                              <button
-                                onClick={(e) => handleReactivateTask(task.id, e)}
-                                className={`${themeClasses.textMuted} hover:text-blue-400 text-sm transition-colors`}
-                                title="Réactiver la tâche"
-                              >
-                                🔄
-                              </button>
-                            )}
-                            <button
-                              onClick={(e) => handleDeleteTask(task.id, e)}
-                              className={`${themeClasses.textMuted} hover:text-red-400 text-sm transition-colors`}
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </div>
-                        <p className={`text-[11px] ${themeClasses.textSecondary} mb-2`}>{task.description}</p>
-                        <div className={`flex justify-between items-center text-[11px] ${themeClasses.textMuted}`}>
-                          <span>⏱️ Estimé: {task.estimateMinutes}min</span>
-                          <span>⏲️ Réel: {Math.floor(task.secondsSpent / 60)}min</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Active Task Timer */}
-              {activeTask && (
-                <div className={`rounded-2xl p-6 transition-all duration-500 ${
-                  isFocusMode
-                    ? 'bg-gradient-to-br from-indigo-900/60 via-purple-900/60 to-pink-900/60 border-2 border-purple-500 shadow-2xl shadow-purple-500/20 scale-105'
-                    : 'bg-gradient-to-br from-blue-900/40 to-purple-900/40 border border-blue-700'
-                }`}>
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-semibold">
-                      {isFocusMode ? '🎯 Mode Focus' : '⏱️ Tâche active'}
-                    </h2>
-                    <div className="flex gap-2">
-                      {!isFocusMode && (
-                        <button
-                          onClick={toggleFocusMode}
-                          className="text-xs rounded-lg px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white cursor-pointer transition-colors"
-                        >
-                          🎯 Mode Focus
-                        </button>
-                      )}
-                      {isFocusMode && (
-                        <button
-                          onClick={toggleFocusMode}
-                          className="text-xs text-neutral-400 hover:text-neutral-200 transition-colors"
-                        >
-                          ✕ Quitter
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Pomodoro Timer (only in focus mode) */}
-                  {isFocusMode && (
-                    <div className="bg-black/30 rounded-xl p-4 mb-4 text-center animate-fade-in">
-                      <div className="text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">
-                        {pomodoroMode === 'work' ? '🎯 Travail Focus' : '☕ Pause'}
-                      </div>
-                      <div className="text-6xl font-bold font-mono mb-2">
-                        {formatPomodoroTime(pomodoroSeconds)}
-                      </div>
-                      <div className="text-[10px] text-neutral-500 mb-3">
-                        🍅 Pomodoros: {pomodoroCount}
-                      </div>
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={handlePomodoroToggle}
-                          className="px-4 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-colors"
-                        >
-                          {isPomodoroRunning ? '⏸️ Pause' : '▶️ Démarrer'}
-                        </button>
-                        <button
-                          onClick={handlePomodoroReset}
-                          className="px-4 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition-colors"
-                        >
-                          🔄 Reset
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Motivational Message (only in focus mode) */}
-                  {isFocusMode && motivationalMessage && (
-                    <div className="mb-4 text-center animate-pulse">
-                      <div className="bg-gradient-to-r from-yellow-400/20 to-orange-400/20 rounded-lg px-4 py-2">
-                        <p className="text-sm font-semibold">{motivationalMessage}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mb-4">
-                    <h3 className="text-xl font-bold mb-2">{activeTask.title}</h3>
-                    <p className="text-sm text-neutral-300">{activeTask.description}</p>
-                  </div>
-
-                  <div className="bg-black/30 rounded-xl p-6 mb-4">
-                    <div className="text-5xl font-mono font-bold text-center mb-2">
-                      {formatTime(activeTask.secondsSpent)}
-                    </div>
-                    <div className="flex justify-center gap-4 text-[11px] text-neutral-400">
-                      <span>Estimé: {activeTask.estimateMinutes}min</span>
-                      <span>|</span>
-                      <span className={
-                        activeTask.secondsSpent > activeTask.estimateMinutes * 60
-                          ? 'text-orange-400'
-                          : 'text-green-400'
-                      }>
-                        Écart: {Math.floor(activeTask.secondsSpent / 60) - activeTask.estimateMinutes}min
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 mb-4">
-                    {isRunning ? (
-                      <button
-                        onClick={handlePause}
-                        className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg px-4 py-3 font-medium transition-colors"
-                      >
-                        ⏸️ Pause
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleResume}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-3 font-medium transition-colors"
-                      >
-                        {activeTask.secondsSpent === 0 ? '▶️ Démarrer' : '▶️ Reprendre'}
-                      </button>
-                    )}
-                    <button
-                      onClick={handleComplete}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-3 font-medium transition-colors"
-                    >
-                      ✅ Terminé
-                    </button>
-                  </div>
-
-                  {/* Block Note */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">⚠️ Blocage actuel ?</label>
-                    <textarea
-                      value={activeTask.blockNote}
-                      onChange={handleBlockNoteChange}
-                      placeholder="Décrivez le problème rencontré..."
-                      rows="3"
-                      className={`w-full ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {!activeTask && (
-                <div className={`${themeClasses.card} border rounded-2xl p-8 text-center`}>
-                  <p className={`${themeClasses.textMuted} mb-2`}>Aucune tâche active</p>
-                  <p className={`text-[11px] ${themeClasses.textMuted}`}>Cliquez sur une tâche pour démarrer le chrono</p>
-                </div>
-              )}
-            </div>
-
-            {/* ========== COLUMN C: BILAN DU JOUR ========== */}
+            {/* ========== COLUMN B: BILAN DU JOUR ========== */}
             <div className="space-y-6">
               {/* KPIs */}
               <div className={`${themeClasses.card} border rounded-2xl p-6`}>
@@ -1520,6 +1307,28 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
           <MissionsView
             missions={missions}
             setMissions={setMissions}
+            tasks={tasks}
+            activeTaskId={activeTaskId}
+            isRunning={isRunning}
+            isFocusMode={isFocusMode}
+            draggedTask={draggedTask}
+            handleTaskClick={handleTaskClick}
+            handleDragStart={handleDragStart}
+            handleDragOver={handleDragOver}
+            handleDrop={handleDrop}
+            handleDragEnd={handleDragEnd}
+            handleUnifiedPausePlay={handleUnifiedPausePlay}
+            handleMarkDone={handleMarkDone}
+            handleDeleteTask={handleDeleteTask}
+            toggleFocusMode={toggleFocusMode}
+            formatTime={formatTime}
+            formatPomodoroTime={formatPomodoroTime}
+            pomodoroMode={pomodoroMode}
+            pomodoroSeconds={pomodoroSeconds}
+            isPomodoroRunning={isPomodoroRunning}
+            pomodoroCount={pomodoroCount}
+            handlePomodoroToggle={handlePomodoroToggle}
+            handlePomodoroReset={handlePomodoroReset}
             theme={theme}
             themeClasses={themeClasses}
           />
