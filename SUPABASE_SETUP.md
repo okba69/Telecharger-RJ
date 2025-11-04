@@ -1,4 +1,4 @@
-# 🚀 Configuration Supabase pour ProductivityHub
+# 🚀 Configuration Supabase pour ProducHub
 
 ## 🎯 Configuration Simple (5 minutes)
 
@@ -16,7 +16,7 @@ Vous recevez un email, vous cliquez sur le lien, et vous êtes connecté. C'est 
 3. Connectez-vous avec GitHub (ou créez un compte)
 4. Cliquez sur **"New Project"**
 5. Remplissez:
-   - **Name**: `ProductivityHub`
+   - **Name**: `ProducHub`
    - **Database Password**: Générez un mot de passe fort (vous n'en aurez plus besoin après)
    - **Region**: Choisissez proche de vous (ex: **Europe West - Paris**)
 6. Cliquez sur **"Create new project"**
@@ -303,4 +303,4 @@ TOTAL: ~5 minutes
 
 ---
 
-Vous êtes prêt! 🚀 Votre ProductivityHub est maintenant synchronisé dans le cloud!
+Vous êtes prêt! 🚀 Votre ProducHub est maintenant synchronisé dans le cloud!

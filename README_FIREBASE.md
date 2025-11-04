@@ -1,4 +1,4 @@
-# 🚀 ProductivityHub - Firebase Setup Complete!
+# 🚀 ProducHub - Firebase Setup Complete!
 
 ## ✅ Ce qui a été fait
 

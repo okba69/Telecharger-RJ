@@ -830,7 +830,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
       <header className={`border-b ${themeClasses.header}`}>
         <div className="max-w-[1800px] mx-auto px-6 py-4">
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">ProductivityHub</h1>
+            <h1 className="text-2xl font-bold">ProducHub</h1>
             {supabaseConfigured && (
               <div className="flex items-center gap-4">
                 <div className={`text-sm ${themeClasses.textSecondary}`}>

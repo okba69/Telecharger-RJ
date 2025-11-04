@@ -1,4 +1,4 @@
-# ProductivityHub
+# ProducHub
 
 Application React de gestion de productivité personnelle pour ingénieurs et professionnels.
 
