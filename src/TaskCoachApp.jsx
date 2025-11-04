@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 import { useSupabaseSync } from './hooks/useSupabaseSync'
+import MissionsView from './MissionsView'
 
 function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, supabaseConfigured }) {
   // ========== STATE MANAGEMENT ==========
@@ -49,6 +50,10 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
 
   // Task history (all tasks ever created)
   const [taskHistory, setTaskHistory] = useState(() => loadFromStorage('taskHistory', []))
+
+  // Missions with subtasks
+  const [missions, setMissions] = useState(() => loadFromStorage('missions', []))
+  const [expandedMissionId, setExpandedMissionId] = useState(null)
 
   // Theme (from parent props)
   const theme = initialTheme
@@ -115,6 +120,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   useSupabaseSync(user, supabaseConfigured, currentDate, (value) => setCurrentDate(value), 'currentDate')
   useSupabaseSync(user, supabaseConfigured, taskHistory, setTaskHistory, 'taskHistory')
   useSupabaseSync(user, supabaseConfigured, pomodoroConfig, setPomodoroConfig, 'pomodoroConfig')
+  useSupabaseSync(user, supabaseConfigured, missions, setMissions, 'missions')
 
   // ========== TIMER LOGIC ==========
   // Main timer loop with precise timing
@@ -889,7 +895,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
 
           {/* Tabs */}
           <nav className="flex gap-2">
-            {['today', 'analyze', 'history', 'settings'].map(tab => (
+            {['today', 'missions', 'analyze', 'history', 'settings'].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -900,6 +906,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                 }`}
               >
                 {tab === 'today' && "Aujourd'hui"}
+                {tab === 'missions' && '🎯 Missions'}
                 {tab === 'analyze' && 'Analyse'}
                 {tab === 'history' && 'Historique'}
                 {tab === 'settings' && 'Paramètres'}
@@ -1507,6 +1514,15 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'missions' && (
+          <MissionsView
+            missions={missions}
+            setMissions={setMissions}
+            theme={theme}
+            themeClasses={themeClasses}
+          />
         )}
 
         {activeTab === 'analyze' && (
