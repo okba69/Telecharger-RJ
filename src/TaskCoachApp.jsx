@@ -59,11 +59,17 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   const [isLaunching, setIsLaunching] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [pomodoroMode, setPomodoroMode] = useState('work') // 'work' | 'break'
-  const [pomodoroSeconds, setPomodoroSeconds] = useState(25 * 60) // 25 minutes
+  const [pomodoroSeconds, setPomodoroSeconds] = useState(25 * 60) // Current countdown
   const [isPomodoroRunning, setIsPomodoroRunning] = useState(false)
-  const pomodoroTickRef = useRef(Date.now())
+  const pomodoroStartTimeRef = useRef(null) // Absolute start time for pomodoro
+  const pomodoroBaseDurationRef = useRef(25 * 60) // Total duration for current session
   const [motivationalMessage, setMotivationalMessage] = useState('')
   const [pomodoroCount, setPomodoroCount] = useState(0)
+
+  // Pomodoro configuration
+  const [pomodoroConfig, setPomodoroConfig] = useState(() =>
+    loadFromStorage('pomodoroConfig', { workMinutes: 25, breakMinutes: 5 })
+  )
 
   // Drag and drop
   const [draggedTask, setDraggedTask] = useState(null)
@@ -108,6 +114,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   useSupabaseSync(user, supabaseConfigured, history, setHistory, 'history')
   useSupabaseSync(user, supabaseConfigured, currentDate, (value) => setCurrentDate(value), 'currentDate')
   useSupabaseSync(user, supabaseConfigured, taskHistory, setTaskHistory, 'taskHistory')
+  useSupabaseSync(user, supabaseConfigured, pomodoroConfig, setPomodoroConfig, 'pomodoroConfig')
 
   // ========== TIMER LOGIC ==========
   // Main timer loop with precise timing
@@ -147,37 +154,49 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   useEffect(() => {
     if (!isPomodoroRunning) return
 
-    const interval = setInterval(() => {
-      const now = Date.now()
-      const deltaSeconds = Math.floor((now - pomodoroTickRef.current) / 1000)
+    // Safety check: ensure refs are initialized
+    if (pomodoroStartTimeRef.current === null) {
+      pomodoroStartTimeRef.current = Date.now()
+    }
 
-      if (deltaSeconds >= 1) {
-        setPomodoroSeconds(prev => {
-          const newSeconds = prev - deltaSeconds
-          if (newSeconds <= 0) {
-            // Timer finished
-            playNotificationSound()
-            if (pomodoroMode === 'work') {
-              setPomodoroMode('break')
-              setPomodoroSeconds(5 * 60) // 5 min break
-              setPomodoroCount(prev => prev + 1)
-              setMotivationalMessage('🎉 Excellent travail ! Prenez une pause bien méritée !')
-            } else {
-              setPomodoroMode('work')
-              setPomodoroSeconds(25 * 60) // 25 min work
-              const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
-              setMotivationalMessage(randomMsg)
-            }
-            return pomodoroMode === 'work' ? 5 * 60 : 25 * 60
-          }
-          return newSeconds
-        })
-        pomodoroTickRef.current = now
+    const interval = setInterval(() => {
+      if (pomodoroStartTimeRef.current === null) return
+
+      const now = Date.now()
+      const elapsedMs = now - pomodoroStartTimeRef.current
+      const elapsedSeconds = Math.floor(elapsedMs / 1000)
+      const remainingSeconds = pomodoroBaseDurationRef.current - elapsedSeconds
+
+      if (remainingSeconds <= 0) {
+        // Timer finished
+        playNotificationSound()
+        setIsPomodoroRunning(false)
+        pomodoroStartTimeRef.current = null
+
+        if (pomodoroMode === 'work') {
+          // Switch to break
+          setPomodoroMode('break')
+          const breakDuration = pomodoroConfig.breakMinutes * 60
+          setPomodoroSeconds(breakDuration)
+          pomodoroBaseDurationRef.current = breakDuration
+          setPomodoroCount(prev => prev + 1)
+          setMotivationalMessage('🎉 Excellent travail ! Prenez une pause bien méritée !')
+        } else {
+          // Switch to work
+          setPomodoroMode('work')
+          const workDuration = pomodoroConfig.workMinutes * 60
+          setPomodoroSeconds(workDuration)
+          pomodoroBaseDurationRef.current = workDuration
+          const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
+          setMotivationalMessage(randomMsg)
+        }
+      } else {
+        setPomodoroSeconds(remainingSeconds)
       }
-    }, 1000)
+    }, 100) // Update every 100ms for smooth display
 
     return () => clearInterval(interval)
-  }, [isPomodoroRunning, pomodoroMode])
+  }, [isPomodoroRunning, pomodoroMode, pomodoroConfig])
 
   // Generate motivational message periodically
   useEffect(() => {
@@ -680,9 +699,11 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
         setIsLaunching(false)
         setIsFocusMode(true)
         setPomodoroMode('work')
-        setPomodoroSeconds(25 * 60)
+        const workDuration = pomodoroConfig.workMinutes * 60
+        setPomodoroSeconds(workDuration)
+        pomodoroBaseDurationRef.current = workDuration
+        pomodoroStartTimeRef.current = Date.now()
         setIsPomodoroRunning(true)
-        pomodoroTickRef.current = Date.now()
 
         // Start task timer automatically - initialize timing refs
         const task = tasks.find(t => t.id === activeTaskId)
@@ -699,6 +720,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
       // Stopping focus mode - keep timer running if it was running
       setIsFocusMode(false)
       setIsPomodoroRunning(false)
+      pomodoroStartTimeRef.current = null
       // Don't reset timer refs here - let the timer continue if it was running
     }
   }
@@ -737,20 +759,28 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
     // Toggle pomodoro timer
     setIsPomodoroRunning(newRunningState)
     if (newRunningState) {
-      pomodoroTickRef.current = Date.now()
+      pomodoroStartTimeRef.current = Date.now()
+    } else {
+      pomodoroStartTimeRef.current = null
     }
   }
 
   const handlePomodoroToggle = () => {
-    setIsPomodoroRunning(!isPomodoroRunning)
-    if (!isPomodoroRunning) {
-      pomodoroTickRef.current = Date.now()
+    const newState = !isPomodoroRunning
+    setIsPomodoroRunning(newState)
+    if (newState) {
+      pomodoroStartTimeRef.current = Date.now()
+    } else {
+      pomodoroStartTimeRef.current = null
     }
   }
 
   const handlePomodoroReset = () => {
     setPomodoroMode('work')
-    setPomodoroSeconds(25 * 60)
+    const workDuration = pomodoroConfig.workMinutes * 60
+    setPomodoroSeconds(workDuration)
+    pomodoroBaseDurationRef.current = workDuration
+    pomodoroStartTimeRef.current = null
     setIsPomodoroRunning(false)
   }
 
@@ -1668,6 +1698,80 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                 </div>
               </div>
 
+              {/* Pomodoro Configuration */}
+              <div className={`${themeClasses.bgSecondary} border ${themeClasses.border} rounded-xl p-6`}>
+                <h3 className="text-lg font-semibold mb-4">⏱️ Configuration Pomodoro</h3>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-3">Type de Pomodoro</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setPomodoroConfig({ workMinutes: 25, breakMinutes: 5 })}
+                        className={`px-4 py-3 rounded-lg font-medium transition-all border-2 ${
+                          pomodoroConfig.workMinutes === 25 && pomodoroConfig.breakMinutes === 5
+                            ? 'bg-blue-600 text-white border-blue-500'
+                            : theme === 'light'
+                            ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                            : 'bg-neutral-800 text-neutral-300 border-neutral-700 hover:bg-neutral-700'
+                        }`}
+                      >
+                        <div className="text-lg">🍅 Classique</div>
+                        <div className="text-xs mt-1 opacity-80">25 min / 5 min</div>
+                      </button>
+
+                      <button
+                        onClick={() => setPomodoroConfig({ workMinutes: 50, breakMinutes: 10 })}
+                        className={`px-4 py-3 rounded-lg font-medium transition-all border-2 ${
+                          pomodoroConfig.workMinutes === 50 && pomodoroConfig.breakMinutes === 10
+                            ? 'bg-blue-600 text-white border-blue-500'
+                            : theme === 'light'
+                            ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                            : 'bg-neutral-800 text-neutral-300 border-neutral-700 hover:bg-neutral-700'
+                        }`}
+                      >
+                        <div className="text-lg">🚀 Deep Work</div>
+                        <div className="text-xs mt-1 opacity-80">50 min / 10 min</div>
+                      </button>
+
+                      <button
+                        onClick={() => setPomodoroConfig({ workMinutes: 90, breakMinutes: 20 })}
+                        className={`px-4 py-3 rounded-lg font-medium transition-all border-2 ${
+                          pomodoroConfig.workMinutes === 90 && pomodoroConfig.breakMinutes === 20
+                            ? 'bg-blue-600 text-white border-blue-500'
+                            : theme === 'light'
+                            ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                            : 'bg-neutral-800 text-neutral-300 border-neutral-700 hover:bg-neutral-700'
+                        }`}
+                      >
+                        <div className="text-lg">⚡ Ultra Focus</div>
+                        <div className="text-xs mt-1 opacity-80">90 min / 20 min</div>
+                      </button>
+
+                      <button
+                        onClick={() => setPomodoroConfig({ workMinutes: 15, breakMinutes: 3 })}
+                        className={`px-4 py-3 rounded-lg font-medium transition-all border-2 ${
+                          pomodoroConfig.workMinutes === 15 && pomodoroConfig.breakMinutes === 3
+                            ? 'bg-blue-600 text-white border-blue-500'
+                            : theme === 'light'
+                            ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                            : 'bg-neutral-800 text-neutral-300 border-neutral-700 hover:bg-neutral-700'
+                        }`}
+                      >
+                        <div className="text-lg">⚡ Sprint</div>
+                        <div className="text-xs mt-1 opacity-80">15 min / 3 min</div>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className={`${theme === 'light' ? 'bg-blue-50 border-blue-200' : 'bg-blue-900/20 border-blue-800'} border rounded-lg p-3`}>
+                    <p className="text-xs">
+                      <strong>Actuel :</strong> {pomodoroConfig.workMinutes} min travail / {pomodoroConfig.breakMinutes} min pause
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Firebase Status */}
               {!supabaseConfigured && (
                 <div className={`${themeClasses.bgSecondary} border-2 ${theme === 'light' ? 'border-blue-300 bg-blue-50' : 'border-blue-800 bg-blue-900/20'} rounded-xl p-6`}>
@@ -1709,7 +1813,6 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                 <h3 className="text-lg font-semibold mb-4">⏰ Paramètres à venir</h3>
                 <ul className={`list-disc list-inside space-y-2 text-sm ${themeClasses.textSecondary} ml-4`}>
                   <li>Heure de début de journée (par défaut 9h00)</li>
-                  <li>Durée d'un bloc focus (Pomodoro 25min, Deep Work 50min, Custom...)</li>
                   <li>Rappels automatiques (pause, hydratation, étirements)</li>
                   <li>Objectif de temps productif quotidien</li>
                   <li>Notifications pour les tâches dépassant l'estimation</li>
