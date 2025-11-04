@@ -69,6 +69,10 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   const [draggedTask, setDraggedTask] = useState(null)
   const [draggedInboxItem, setDraggedInboxItem] = useState(null)
 
+  // Collapsible sections
+  const [isNewTaskOpen, setIsNewTaskOpen] = useState(false)
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
+
   // Audio
   const audioContextRef = useRef(null)
   const ambientOscillatorRef = useRef(null)
@@ -1066,9 +1070,16 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
 
               {/* Add New Task */}
               <div className={`${themeClasses.card} border rounded-2xl p-6`}>
-                <h2 className="text-lg font-semibold mb-4">➕ Nouvelle tâche</h2>
+                <h2
+                  className="text-lg font-semibold mb-4 cursor-pointer flex justify-between items-center hover:text-blue-500 transition-colors"
+                  onClick={() => setIsNewTaskOpen(!isNewTaskOpen)}
+                >
+                  <span>➕ Nouvelle tâche</span>
+                  <span className="text-sm">{isNewTaskOpen ? '▼' : '▶'}</span>
+                </h2>
 
-                <form onSubmit={handleAddTask} className="space-y-3">
+                {isNewTaskOpen && (
+                  <form onSubmit={handleAddTask} className="space-y-3">
                   {/* Task History Selector */}
                   {taskHistory.length > 0 && (
                     <div>
@@ -1124,6 +1135,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                     </button>
                   </div>
                 </form>
+                )}
               </div>
             </div>
 
@@ -1411,9 +1423,17 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
 
               {/* Feedback Personnel */}
               <div className={`${themeClasses.card} border rounded-2xl p-6`}>
-                <h2 className="text-lg font-semibold mb-4">💭 Feedback perso</h2>
+                <h2
+                  className="text-lg font-semibold mb-4 cursor-pointer flex justify-between items-center hover:text-purple-500 transition-colors"
+                  onClick={() => setIsFeedbackOpen(!isFeedbackOpen)}
+                >
+                  <span>💭 Feedback perso</span>
+                  <span className="text-sm">{isFeedbackOpen ? '▼' : '▶'}</span>
+                </h2>
 
-                <textarea
+                {isFeedbackOpen && (
+                  <>
+                    <textarea
                   value={dailyFeedback}
                   onChange={(e) => setDailyFeedback(e.target.value)}
                   placeholder="Comment s'est passée votre journée ? Qu'avez-vous appris ?"
@@ -1452,6 +1472,8 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                     />
                   </div>
                 </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
