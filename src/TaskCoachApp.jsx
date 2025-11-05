@@ -514,6 +514,9 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
     playNotificationSound()
   }
 
+  // Alias pour MissionsView
+  const handleMarkDone = handleComplete
+
   const handleReactivateTask = (taskId, e) => {
     e.stopPropagation()
     setTasks(prevTasks =>
