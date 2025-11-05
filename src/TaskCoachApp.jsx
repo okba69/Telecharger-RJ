@@ -26,6 +26,9 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   const startTimeRef = useRef(null) // Absolute start time for current running session
   const baseSecondsRef = useRef(0) // Accumulated seconds before current session
 
+  // Active subtask tracking (for new unified missions system)
+  const [activeSubtaskId, setActiveSubtaskId] = useState(null) // { missionId, subtaskId }
+
   // Inbox (renamed to "À faire")
   const [inboxItems, setInboxItems] = useState(() => loadFromStorage('inboxItems', []))
   const [newInboxItem, setNewInboxItem] = useState('')
@@ -1308,27 +1311,13 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
             missions={missions}
             setMissions={setMissions}
             tasks={tasks}
-            activeTaskId={activeTaskId}
+            setTasks={setTasks}
+            activeSubtaskId={activeSubtaskId}
+            setActiveSubtaskId={setActiveSubtaskId}
             isRunning={isRunning}
-            isFocusMode={isFocusMode}
-            draggedTask={draggedTask}
-            handleTaskClick={handleTaskClick}
-            handleDragStart={handleDragStart}
-            handleDragOver={handleDragOver}
-            handleDrop={handleDrop}
-            handleDragEnd={handleDragEnd}
-            handleUnifiedPausePlay={handleUnifiedPausePlay}
-            handleComplete={handleComplete}
-            handleDeleteTask={handleDeleteTask}
-            toggleFocusMode={toggleFocusMode}
-            formatTime={formatTime}
-            formatPomodoroTime={formatPomodoroTime}
-            pomodoroMode={pomodoroMode}
-            pomodoroSeconds={pomodoroSeconds}
-            isPomodoroRunning={isPomodoroRunning}
-            pomodoroCount={pomodoroCount}
-            handlePomodoroToggle={handlePomodoroToggle}
-            handlePomodoroReset={handlePomodoroReset}
+            setIsRunning={setIsRunning}
+            startTimeRef={startTimeRef}
+            baseSecondsRef={baseSecondsRef}
             theme={theme}
             themeClasses={themeClasses}
           />
