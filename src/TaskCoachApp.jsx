@@ -1318,6 +1318,18 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
             setIsRunning={setIsRunning}
             startTimeRef={startTimeRef}
             baseSecondsRef={baseSecondsRef}
+            isFocusMode={isFocusMode}
+            setIsFocusMode={setIsFocusMode}
+            pomodoroMode={pomodoroMode}
+            setPomodoroMode={setPomodoroMode}
+            pomodoroSeconds={pomodoroSeconds}
+            setPomodoroSeconds={setPomodoroSeconds}
+            isPomodoroRunning={isPomodoroRunning}
+            setIsPomodoroRunning={setIsPomodoroRunning}
+            pomodoroStartTimeRef={pomodoroStartTimeRef}
+            pomodoroBaseDurationRef={pomodoroBaseDurationRef}
+            pomodoroCount={pomodoroCount}
+            pomodoroConfig={pomodoroConfig}
             theme={theme}
             themeClasses={themeClasses}
           />

@@ -11,6 +11,18 @@ function MissionsView({
   setIsRunning,
   startTimeRef,
   baseSecondsRef,
+  isFocusMode,
+  setIsFocusMode,
+  pomodoroMode,
+  setPomodoroMode,
+  pomodoroSeconds,
+  setPomodoroSeconds,
+  isPomodoroRunning,
+  setIsPomodoroRunning,
+  pomodoroStartTimeRef,
+  pomodoroBaseDurationRef,
+  pomodoroCount,
+  pomodoroConfig,
   theme,
   themeClasses
 }) {
@@ -44,33 +56,55 @@ function MissionsView({
     done: '✅'
   }
 
-  // MIGRATION: Convert old tasks to missions on first load
+  // MIGRATION: Convert old tasks to individual missions
   useEffect(() => {
     if (tasks && tasks.length > 0 && !localStorage.getItem('tasksMigrated')) {
-      console.log('Migrating tasks to missions...')
+      console.log('Migrating', tasks.length, 'tasks to individual missions...')
 
-      const diverseMission = {
-        id: Date.now(),
-        title: 'Tâches diverses',
+      // Create a separate mission for each task
+      const newMissions = tasks.map((task, index) => ({
+        id: Date.now() + index,
+        title: task.title,
         category: 'work',
-        description: 'Anciennes tâches migrées automatiquement',
-        status: 'doing',
-        subtasks: tasks.map(task => ({
-          id: task.id,
-          text: task.title,
-          description: task.description || '',
-          completed: task.status === 'done',
-          estimateMinutes: task.estimateMinutes || 0,
-          secondsSpent: task.secondsSpent || 0,
-          note: task.blockNote || ''
-        })),
-        createdAt: Date.now()
-      }
+        description: task.description || '',
+        status: task.status === 'done' ? 'done' : 'doing',
+        subtasks: [],
+        createdAt: Date.now() + index
+      }))
 
-      setMissions([...missions, diverseMission])
+      setMissions([...missions, ...newMissions])
       localStorage.setItem('tasksMigrated', 'true')
+      console.log('Migration complete:', newMissions.length, 'missions created')
     }
   }, [])
+
+  // SECOND MIGRATION: Convert "Tâches diverses" subtasks to individual missions
+  useEffect(() => {
+    const diverseMission = missions.find(m => m.title === 'Tâches diverses')
+    if (diverseMission && diverseMission.subtasks.length > 0 && !localStorage.getItem('diversesMigrated')) {
+      console.log('Converting Tâches diverses subtasks to individual missions...')
+
+      // Create a mission for each subtask
+      const newMissions = diverseMission.subtasks.map((subtask, index) => ({
+        id: Date.now() + index,
+        title: subtask.text,
+        category: 'work',
+        description: subtask.description || '',
+        status: subtask.completed ? 'done' : 'doing',
+        subtasks: [],
+        createdAt: Date.now() + index
+      }))
+
+      // Remove the "Tâches diverses" mission and add new missions
+      setMissions([
+        ...missions.filter(m => m.id !== diverseMission.id),
+        ...newMissions
+      ])
+
+      localStorage.setItem('diversesMigrated', 'true')
+      console.log('Conversion complete:', newMissions.length, 'missions created')
+    }
+  }, [missions])
 
   const handleCreateMission = (e) => {
     e.preventDefault()
@@ -247,6 +281,50 @@ function MissionsView({
     return h + ':' + pad(m) + ':' + pad(s)
   }
 
+  const formatPomodoroTime = (seconds) => {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    const pad = (num) => num.toString().padStart(2, '0')
+    return pad(m) + ':' + pad(s)
+  }
+
+  const toggleFocusMode = () => {
+    if (!isFocusMode) {
+      // Entering focus mode
+      setIsFocusMode(true)
+      const workDuration = pomodoroConfig.workMinutes * 60
+      setPomodoroSeconds(workDuration)
+      pomodoroBaseDurationRef.current = workDuration
+      pomodoroStartTimeRef.current = Date.now()
+      setIsPomodoroRunning(true)
+      setPomodoroMode('work')
+    } else {
+      // Exiting focus mode
+      setIsFocusMode(false)
+      setIsPomodoroRunning(false)
+      pomodoroStartTimeRef.current = null
+    }
+  }
+
+  const handlePomodoroToggle = () => {
+    if (isPomodoroRunning) {
+      setIsPomodoroRunning(false)
+      pomodoroStartTimeRef.current = null
+    } else {
+      pomodoroStartTimeRef.current = Date.now()
+      setIsPomodoroRunning(true)
+    }
+  }
+
+  const handlePomodoroReset = () => {
+    const workDuration = pomodoroConfig.workMinutes * 60
+    setPomodoroSeconds(workDuration)
+    pomodoroBaseDurationRef.current = workDuration
+    pomodoroStartTimeRef.current = null
+    setIsPomodoroRunning(false)
+    setPomodoroMode('work')
+  }
+
   const getFilteredAndSortedMissions = () => {
     let filtered = missions
     if (categoryFilter !== 'all') filtered = filtered.filter(m => m.category === categoryFilter)
@@ -357,25 +435,88 @@ function MissionsView({
       )}
 
       {activeData && (
-        <div className={themeClasses.card + ' border-2 border-blue-500 rounded-lg p-4 mb-4 shadow-lg bg-gradient-to-br ' + (theme === 'light' ? 'from-blue-50 to-purple-50' : 'from-blue-950/50 to-purple-950/50')}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex-1">
-              <div className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">{activeData.mission.title}</div>
-              <div className="font-bold">{activeData.subtask.text}</div>
-            </div>
-            <div className="text-2xl font-mono font-bold text-blue-600 dark:text-blue-400">
-              {formatTime(activeData.subtask.secondsSpent)}
+        <div className={themeClasses.card + ' rounded-2xl p-4 mb-4 shadow-lg ' + (isFocusMode ? 'bg-gradient-to-br from-indigo-900/60 via-purple-900/60 to-pink-900/60 border-2 border-purple-500 shadow-purple-500/20' : 'bg-gradient-to-br from-blue-900/40 to-purple-900/40 border-2 border-blue-500')}>
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-lg font-semibold">
+              {isFocusMode ? '🎯 Mode Focus' : '⏱️ Mission active'}
+            </h2>
+            <div className="flex gap-2">
+              {!isFocusMode && (
+                <button
+                  onClick={toggleFocusMode}
+                  className="text-xs rounded-lg px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white transition-colors"
+                >
+                  🎯 Mode Focus
+                </button>
+              )}
+              {isFocusMode && (
+                <button
+                  onClick={toggleFocusMode}
+                  className="text-xs text-neutral-400 hover:text-neutral-200 transition-colors"
+                >
+                  ✕ Quitter
+                </button>
+              )}
             </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setIsRunning(!isRunning)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-bold transition-colors">
-              {isRunning ? '⏸️ Pause' : '▶️ Démarrer'}
-            </button>
-            <button onClick={handleCompleteSubtask} className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-2 text-sm font-bold transition-colors">
-              ✓ Terminer
-            </button>
-            <button onClick={() => { handleStopSubtask(); setActiveSubtaskId(null); }} className={'px-4 py-2 rounded-lg text-sm font-medium transition-colors ' + (theme === 'light' ? 'bg-gray-200 hover:bg-gray-300' : 'bg-neutral-800 hover:bg-neutral-700')}>
-              ✕
+
+          {isFocusMode && (
+            <div className="bg-black/30 rounded-xl p-4 mb-4 text-center">
+              <div className="text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">
+                {pomodoroMode === 'work' ? '🎯 Travail Focus' : '☕ Pause'}
+              </div>
+              <div className="text-5xl font-bold font-mono mb-2">
+                {formatPomodoroTime(pomodoroSeconds)}
+              </div>
+              <div className="text-[10px] text-neutral-500 mb-3">
+                🍅 Pomodoros: {pomodoroCount}
+              </div>
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={handlePomodoroToggle}
+                  className="px-4 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-colors"
+                >
+                  {isPomodoroRunning ? '⏸️ Pause' : '▶️ Démarrer'}
+                </button>
+                <button
+                  onClick={handlePomodoroReset}
+                  className="px-4 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition-colors"
+                >
+                  🔄 Reset
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <div className={'rounded-xl p-4 ' + (theme === 'light' ? 'bg-white/10' : 'bg-black/20')}>
+              <div className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">{activeData.mission.title}</div>
+              <h3 className="font-bold text-lg mb-2">{activeData.subtask.text}</h3>
+              <div className="text-3xl font-mono font-bold text-center py-2">
+                {formatTime(activeData.subtask.secondsSpent)}
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsRunning(!isRunning)}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-bold transition-colors"
+              >
+                {isRunning ? '⏸️ Pause' : '▶️ Démarrer'}
+              </button>
+              <button
+                onClick={handleCompleteSubtask}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-2 text-sm font-bold transition-colors"
+              >
+                ✓ Terminer
+              </button>
+            </div>
+
+            <button
+              onClick={() => { handleStopSubtask(); setActiveSubtaskId(null); }}
+              className={'w-full ' + (theme === 'light' ? 'text-gray-600 hover:text-red-600' : 'text-gray-400 hover:text-red-400') + ' text-xs transition-colors'}
+            >
+              ✕ Arrêter et fermer
             </button>
           </div>
         </div>
