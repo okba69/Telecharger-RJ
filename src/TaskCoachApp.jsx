@@ -1318,7 +1318,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
             handleDrop={handleDrop}
             handleDragEnd={handleDragEnd}
             handleUnifiedPausePlay={handleUnifiedPausePlay}
-            handleMarkDone={handleMarkDone}
+            handleComplete={handleComplete}
             handleDeleteTask={handleDeleteTask}
             toggleFocusMode={toggleFocusMode}
             formatTime={formatTime}

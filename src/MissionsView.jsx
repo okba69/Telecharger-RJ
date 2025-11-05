@@ -14,7 +14,7 @@ function MissionsView({
   handleDrop,
   handleDragEnd,
   handleUnifiedPausePlay,
-  handleMarkDone,
+  handleComplete,
   handleDeleteTask,
   toggleFocusMode,
   formatTime,
@@ -272,7 +272,12 @@ function MissionsView({
                       <div className="flex items-center gap-2 flex-1">
                         <span className={`${themeClasses.textMuted} text-xs cursor-grab`}>⋮⋮</span>
                         <div className="flex-1">
-                          <h3 className="text-sm font-semibold">{task.text}</h3>
+                          <h3 className="text-sm font-semibold">{task.title}</h3>
+                          {task.description && (
+                            <p className={`text-[10px] ${themeClasses.textSecondary} mb-1`}>
+                              {task.description}
+                            </p>
+                          )}
                           {task.estimateMinutes > 0 && (
                             <p className={`text-[10px] ${themeClasses.textMuted}`}>
                               Estimé: {task.estimateMinutes} min
@@ -361,7 +366,12 @@ function MissionsView({
           {activeTask ? (
             <div className="space-y-4">
               <div className={`rounded-xl p-4 ${theme === 'light' ? 'bg-white/10' : 'bg-black/20'}`}>
-                <h3 className="font-bold text-lg mb-2">{activeTask.text}</h3>
+                <h3 className="font-bold text-lg mb-2">{activeTask.title}</h3>
+                {activeTask.description && (
+                  <p className={`text-xs ${themeClasses.textSecondary} mb-2`}>
+                    {activeTask.description}
+                  </p>
+                )}
                 {activeTask.estimateMinutes > 0 && (
                   <p className={`text-xs ${themeClasses.textMuted} mb-2`}>
                     Estimé: {activeTask.estimateMinutes} min
@@ -380,7 +390,7 @@ function MissionsView({
                   {isRunning ? '⏸️ Pause' : '▶️ Démarrer'}
                 </button>
                 <button
-                  onClick={handleMarkDone}
+                  onClick={handleComplete}
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-3 text-sm font-bold transition-all"
                 >
                   ✓ Terminer
@@ -388,7 +398,7 @@ function MissionsView({
               </div>
 
               <button
-                onClick={handleDeleteTask}
+                onClick={(e) => handleDeleteTask(activeTaskId, e)}
                 className={`w-full ${themeClasses.textMuted} hover:text-red-400 text-xs transition-colors`}
               >
                 🗑️ Supprimer la tâche
