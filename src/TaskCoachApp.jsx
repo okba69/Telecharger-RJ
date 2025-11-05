@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 import { useSupabaseSync } from './hooks/useSupabaseSync'
+import MissionsView from './MissionsView'
 
 function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, supabaseConfigured }) {
   // ========== STATE MANAGEMENT ==========
@@ -22,12 +23,14 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   // Active task tracking
   const [activeTaskId, setActiveTaskId] = useState(null)
   const [isRunning, setIsRunning] = useState(false)
-  const lastTickRef = useRef(Date.now())
+  const startTimeRef = useRef(null) // Absolute start time for current running session
+  const baseSecondsRef = useRef(0) // Accumulated seconds before current session
 
   // Inbox (renamed to "À faire")
   const [inboxItems, setInboxItems] = useState(() => loadFromStorage('inboxItems', []))
   const [newInboxItem, setNewInboxItem] = useState('')
   const [inboxCategory, setInboxCategory] = useState('travail') // 'travail' or 'ecole'
+  const [inboxDeadline, setInboxDeadline] = useState('') // Date deadline for inbox items
 
   // New task form
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -48,6 +51,10 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   // Task history (all tasks ever created)
   const [taskHistory, setTaskHistory] = useState(() => loadFromStorage('taskHistory', []))
 
+  // Missions with subtasks
+  const [missions, setMissions] = useState(() => loadFromStorage('missions', []))
+  const [expandedMissionId, setExpandedMissionId] = useState(null)
+
   // Theme (from parent props)
   const theme = initialTheme
   const setTheme = setParentTheme
@@ -57,15 +64,25 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   const [isLaunching, setIsLaunching] = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [pomodoroMode, setPomodoroMode] = useState('work') // 'work' | 'break'
-  const [pomodoroSeconds, setPomodoroSeconds] = useState(25 * 60) // 25 minutes
+  const [pomodoroSeconds, setPomodoroSeconds] = useState(25 * 60) // Current countdown
   const [isPomodoroRunning, setIsPomodoroRunning] = useState(false)
-  const pomodoroTickRef = useRef(Date.now())
+  const pomodoroStartTimeRef = useRef(null) // Absolute start time for pomodoro
+  const pomodoroBaseDurationRef = useRef(25 * 60) // Total duration for current session
   const [motivationalMessage, setMotivationalMessage] = useState('')
   const [pomodoroCount, setPomodoroCount] = useState(0)
+
+  // Pomodoro configuration
+  const [pomodoroConfig, setPomodoroConfig] = useState(() =>
+    loadFromStorage('pomodoroConfig', { workMinutes: 25, breakMinutes: 5 })
+  )
 
   // Drag and drop
   const [draggedTask, setDraggedTask] = useState(null)
   const [draggedInboxItem, setDraggedInboxItem] = useState(null)
+
+  // Collapsible sections
+  const [isNewTaskOpen, setIsNewTaskOpen] = useState(false)
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
 
   // Audio
   const audioContextRef = useRef(null)
@@ -102,65 +119,101 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   useSupabaseSync(user, supabaseConfigured, history, setHistory, 'history')
   useSupabaseSync(user, supabaseConfigured, currentDate, (value) => setCurrentDate(value), 'currentDate')
   useSupabaseSync(user, supabaseConfigured, taskHistory, setTaskHistory, 'taskHistory')
+  useSupabaseSync(user, supabaseConfigured, pomodoroConfig, setPomodoroConfig, 'pomodoroConfig')
+  useSupabaseSync(user, supabaseConfigured, missions, setMissions, 'missions')
+
+  // Migrate existing missions to add category field (backward compatibility)
+  useEffect(() => {
+    const needsMigration = missions.some(m => !m.category)
+    if (needsMigration) {
+      setMissions(missions.map(m => ({
+        ...m,
+        category: m.category || 'work'
+      })))
+    }
+  }, []) // Only run once on mount
 
   // ========== TIMER LOGIC ==========
+  // Main timer loop with precise timing
   useEffect(() => {
     if (!isRunning || activeTaskId === null) return
 
-    const interval = setInterval(() => {
-      const now = Date.now()
-      const deltaSeconds = Math.floor((now - lastTickRef.current) / 1000)
-
-      if (deltaSeconds >= 1) {
-        setTasks(prevTasks =>
-          prevTasks.map(task =>
-            task.id === activeTaskId
-              ? { ...task, secondsSpent: task.secondsSpent + deltaSeconds }
-              : task
-          )
-        )
-        lastTickRef.current = now
+    // Safety check: ensure refs are initialized
+    if (startTimeRef.current === null) {
+      const task = tasks.find(t => t.id === activeTaskId)
+      if (task) {
+        baseSecondsRef.current = task.secondsSpent
+        startTimeRef.current = Date.now()
       }
-    }, 1000)
+    }
+
+    // Update every 100ms for smooth display, but only increment seconds properly
+    const interval = setInterval(() => {
+      if (startTimeRef.current === null) return // Safety check
+
+      const now = Date.now()
+      const elapsedMs = now - startTimeRef.current
+      const totalSeconds = baseSecondsRef.current + Math.floor(elapsedMs / 1000)
+
+      setTasks(prevTasks =>
+        prevTasks.map(task =>
+          task.id === activeTaskId
+            ? { ...task, secondsSpent: totalSeconds }
+            : task
+        )
+      )
+    }, 100) // Update every 100ms for smooth display
 
     return () => clearInterval(interval)
-  }, [isRunning, activeTaskId])
+  }, [isRunning, activeTaskId, tasks])
 
   // ========== POMODORO TIMER ==========
   useEffect(() => {
     if (!isPomodoroRunning) return
 
-    const interval = setInterval(() => {
-      const now = Date.now()
-      const deltaSeconds = Math.floor((now - pomodoroTickRef.current) / 1000)
+    // Safety check: ensure refs are initialized
+    if (pomodoroStartTimeRef.current === null) {
+      pomodoroStartTimeRef.current = Date.now()
+    }
 
-      if (deltaSeconds >= 1) {
-        setPomodoroSeconds(prev => {
-          const newSeconds = prev - deltaSeconds
-          if (newSeconds <= 0) {
-            // Timer finished
-            playNotificationSound()
-            if (pomodoroMode === 'work') {
-              setPomodoroMode('break')
-              setPomodoroSeconds(5 * 60) // 5 min break
-              setPomodoroCount(prev => prev + 1)
-              setMotivationalMessage('🎉 Excellent travail ! Prenez une pause bien méritée !')
-            } else {
-              setPomodoroMode('work')
-              setPomodoroSeconds(25 * 60) // 25 min work
-              const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
-              setMotivationalMessage(randomMsg)
-            }
-            return pomodoroMode === 'work' ? 5 * 60 : 25 * 60
-          }
-          return newSeconds
-        })
-        pomodoroTickRef.current = now
+    const interval = setInterval(() => {
+      if (pomodoroStartTimeRef.current === null) return
+
+      const now = Date.now()
+      const elapsedMs = now - pomodoroStartTimeRef.current
+      const elapsedSeconds = Math.floor(elapsedMs / 1000)
+      const remainingSeconds = pomodoroBaseDurationRef.current - elapsedSeconds
+
+      if (remainingSeconds <= 0) {
+        // Timer finished
+        playNotificationSound()
+        setIsPomodoroRunning(false)
+        pomodoroStartTimeRef.current = null
+
+        if (pomodoroMode === 'work') {
+          // Switch to break
+          setPomodoroMode('break')
+          const breakDuration = pomodoroConfig.breakMinutes * 60
+          setPomodoroSeconds(breakDuration)
+          pomodoroBaseDurationRef.current = breakDuration
+          setPomodoroCount(prev => prev + 1)
+          setMotivationalMessage('🎉 Excellent travail ! Prenez une pause bien méritée !')
+        } else {
+          // Switch to work
+          setPomodoroMode('work')
+          const workDuration = pomodoroConfig.workMinutes * 60
+          setPomodoroSeconds(workDuration)
+          pomodoroBaseDurationRef.current = workDuration
+          const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
+          setMotivationalMessage(randomMsg)
+        }
+      } else {
+        setPomodoroSeconds(remainingSeconds)
       }
-    }, 1000)
+    }, 100) // Update every 100ms for smooth display
 
     return () => clearInterval(interval)
-  }, [isPomodoroRunning, pomodoroMode])
+  }, [isPomodoroRunning, pomodoroMode, pomodoroConfig])
 
   // Generate motivational message periodically
   useEffect(() => {
@@ -409,6 +462,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
 
   const handlePause = () => {
     setIsRunning(false)
+    startTimeRef.current = null // Reset timing refs when pausing
     if (activeTaskId) {
       setTasks(prevTasks =>
         prevTasks.map(t =>
@@ -419,8 +473,16 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
   }
 
   const handleResume = () => {
+    if (activeTaskId) {
+      const task = tasks.find(t => t.id === activeTaskId)
+      if (task) {
+        baseSecondsRef.current = task.secondsSpent
+        startTimeRef.current = Date.now()
+      }
+    }
+
     setIsRunning(true)
-    lastTickRef.current = Date.now()
+
     if (activeTaskId) {
       // Set active task to 'doing' and all others that were 'doing' to 'paused'
       setTasks(prevTasks =>
@@ -445,6 +507,8 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
       )
     )
     setIsRunning(false)
+    startTimeRef.current = null // Reset timing refs
+    baseSecondsRef.current = 0
     setActiveTaskId(null)
     triggerConfetti()
     playNotificationSound()
@@ -586,9 +650,11 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
       id: Date.now(),
       text: newInboxItem,
       completed: false,
-      category: inboxCategory
+      category: inboxCategory,
+      deadline: inboxDeadline || null // Add deadline if provided
     }])
     setNewInboxItem('')
+    setInboxDeadline('') // Reset deadline after adding
   }
 
   const handleToggleInboxItem = (id) => {
@@ -650,21 +716,29 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
         setIsLaunching(false)
         setIsFocusMode(true)
         setPomodoroMode('work')
-        setPomodoroSeconds(25 * 60)
+        const workDuration = pomodoroConfig.workMinutes * 60
+        setPomodoroSeconds(workDuration)
+        pomodoroBaseDurationRef.current = workDuration
+        pomodoroStartTimeRef.current = Date.now()
         setIsPomodoroRunning(true)
-        pomodoroTickRef.current = Date.now()
 
-        // Start task timer automatically
+        // Start task timer automatically - initialize timing refs
+        const task = tasks.find(t => t.id === activeTaskId)
+        if (task) {
+          baseSecondsRef.current = task.secondsSpent
+          startTimeRef.current = Date.now()
+        }
         setIsRunning(true)
-        lastTickRef.current = Date.now()
 
         const randomMsg = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
         setMotivationalMessage(randomMsg)
       }, 1500)
     } else {
-      // Stopping focus mode
+      // Stopping focus mode - keep timer running if it was running
       setIsFocusMode(false)
       setIsPomodoroRunning(false)
+      pomodoroStartTimeRef.current = null
+      // Don't reset timer refs here - let the timer continue if it was running
     }
   }
 
@@ -672,10 +746,14 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
     const newRunningState = !isRunning
 
     // Toggle task timer
-    setIsRunning(newRunningState)
     if (newRunningState) {
-      lastTickRef.current = Date.now()
+      // Starting - initialize timing refs
       if (activeTaskId) {
+        const task = tasks.find(t => t.id === activeTaskId)
+        if (task) {
+          baseSecondsRef.current = task.secondsSpent
+          startTimeRef.current = Date.now()
+        }
         setTasks(prevTasks =>
           prevTasks.map(t =>
             t.id === activeTaskId ? { ...t, status: 'doing' } : t
@@ -683,6 +761,8 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
         )
       }
     } else {
+      // Pausing - reset timing refs
+      startTimeRef.current = null
       if (activeTaskId) {
         setTasks(prevTasks =>
           prevTasks.map(t =>
@@ -691,24 +771,33 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
         )
       }
     }
+    setIsRunning(newRunningState)
 
     // Toggle pomodoro timer
     setIsPomodoroRunning(newRunningState)
     if (newRunningState) {
-      pomodoroTickRef.current = Date.now()
+      pomodoroStartTimeRef.current = Date.now()
+    } else {
+      pomodoroStartTimeRef.current = null
     }
   }
 
   const handlePomodoroToggle = () => {
-    setIsPomodoroRunning(!isPomodoroRunning)
-    if (!isPomodoroRunning) {
-      pomodoroTickRef.current = Date.now()
+    const newState = !isPomodoroRunning
+    setIsPomodoroRunning(newState)
+    if (newState) {
+      pomodoroStartTimeRef.current = Date.now()
+    } else {
+      pomodoroStartTimeRef.current = null
     }
   }
 
   const handlePomodoroReset = () => {
     setPomodoroMode('work')
-    setPomodoroSeconds(25 * 60)
+    const workDuration = pomodoroConfig.workMinutes * 60
+    setPomodoroSeconds(workDuration)
+    pomodoroBaseDurationRef.current = workDuration
+    pomodoroStartTimeRef.current = null
     setIsPomodoroRunning(false)
   }
 
@@ -795,7 +884,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
       <header className={`border-b ${themeClasses.header}`}>
         <div className="max-w-[1800px] mx-auto px-6 py-4">
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">ProductivityHub</h1>
+            <h1 className="text-2xl font-bold">ProducHub</h1>
             {supabaseConfigured && (
               <div className="flex items-center gap-4">
                 <div className={`text-sm ${themeClasses.textSecondary}`}>
@@ -817,7 +906,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
 
           {/* Tabs */}
           <nav className="flex gap-2">
-            {['today', 'analyze', 'history', 'settings'].map(tab => (
+            {['today', 'missions', 'analyze', 'history', 'settings'].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -828,6 +917,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                 }`}
               >
                 {tab === 'today' && "Aujourd'hui"}
+                {tab === 'missions' && '🎯 Missions'}
                 {tab === 'analyze' && 'Analyse'}
                 {tab === 'history' && 'Historique'}
                 {tab === 'settings' && 'Paramètres'}
@@ -840,7 +930,7 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
       {/* Main Content */}
       <main className="max-w-[1800px] mx-auto px-6 py-6">
         {activeTab === 'today' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* ========== COLUMN A: PLANIFIER ========== */}
             <div className="space-y-6">
               {/* À faire (Inbox with checkbox) */}
@@ -886,15 +976,20 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                   </button>
                 </div>
 
-                <form onSubmit={handleAddInboxItem} className="mb-4">
+                <form onSubmit={handleAddInboxItem} className="mb-4 space-y-2">
+                  <input
+                    type="text"
+                    value={newInboxItem}
+                    onChange={(e) => setNewInboxItem(e.target.value)}
+                    placeholder="Ajouter une chose à faire..."
+                    className={`w-full ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  />
                   <div className="flex gap-2">
                     <input
-                      type="text"
-                      value={newInboxItem}
-                      onChange={(e) => setNewInboxItem(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddInboxItem(e)}
-                      placeholder="Ajouter une chose à faire..."
-                      className={`flex-1 ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      type="date"
+                      value={inboxDeadline}
+                      onChange={(e) => setInboxDeadline(e.target.value)}
+                      className={`flex-1 ${themeClasses.input} rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500`}
                     />
                     <button
                       type="submit"
@@ -912,6 +1007,18 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                       if (a.completed !== b.completed) {
                         return a.completed ? 1 : -1
                       }
+
+                      // Then sort by deadline (items with deadline first, sorted by date)
+                      const hasDeadlineA = !!a.deadline
+                      const hasDeadlineB = !!b.deadline
+
+                      if (hasDeadlineA && !hasDeadlineB) return -1
+                      if (!hasDeadlineA && hasDeadlineB) return 1
+
+                      if (hasDeadlineA && hasDeadlineB) {
+                        return new Date(a.deadline) - new Date(b.deadline)
+                      }
+
                       // Then sort by category (travail first, then école)
                       const catA = a.category || 'travail'
                       const catB = b.category || 'travail'
@@ -929,6 +1036,31 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                         : theme === 'light'
                         ? 'bg-blue-50/50 border-blue-100'
                         : 'bg-blue-900/5 border-blue-900/20'
+
+                      // Calculate deadline status
+                      let deadlineColor = ''
+                      let deadlineText = ''
+                      if (item.deadline) {
+                        const today = new Date()
+                        today.setHours(0, 0, 0, 0)
+                        const deadlineDate = new Date(item.deadline)
+                        const diffTime = deadlineDate - today
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+                        if (diffDays < 0) {
+                          deadlineColor = 'text-red-600 font-semibold'
+                          deadlineText = '🔴'
+                        } else if (diffDays === 0) {
+                          deadlineColor = 'text-orange-600 font-semibold'
+                          deadlineText = '🟠'
+                        } else if (diffDays <= 2) {
+                          deadlineColor = 'text-orange-500'
+                          deadlineText = '🟡'
+                        } else {
+                          deadlineColor = themeClasses.textMuted
+                          deadlineText = '📅'
+                        }
+                      }
 
                       return (
                         <div
@@ -949,9 +1081,16 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                             onChange={() => handleToggleInboxItem(item.id)}
                             className={`w-4 h-4 rounded ${theme === 'light' ? 'border-gray-400' : 'border-neutral-600'} text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer`}
                           />
-                          <p className={`text-sm flex-1 ${item.completed ? `line-through ${themeClasses.textMuted}` : ''}`}>
-                            {item.text}
-                          </p>
+                          <div className="flex-1">
+                            <p className={`text-sm ${item.completed ? `line-through ${themeClasses.textMuted}` : ''}`}>
+                              {item.text}
+                            </p>
+                            {item.deadline && (
+                              <p className={`text-[10px] ${deadlineColor} mt-1`}>
+                                {deadlineText} {new Date(item.deadline).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                              </p>
+                            )}
+                          </div>
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -979,9 +1118,16 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
 
               {/* Add New Task */}
               <div className={`${themeClasses.card} border rounded-2xl p-6`}>
-                <h2 className="text-lg font-semibold mb-4">➕ Nouvelle tâche</h2>
+                <h2
+                  className="text-lg font-semibold mb-4 cursor-pointer flex justify-between items-center hover:text-blue-500 transition-colors"
+                  onClick={() => setIsNewTaskOpen(!isNewTaskOpen)}
+                >
+                  <span>➕ Nouvelle tâche</span>
+                  <span className="text-sm">{isNewTaskOpen ? '▼' : '▶'}</span>
+                </h2>
 
-                <form onSubmit={handleAddTask} className="space-y-3">
+                {isNewTaskOpen && (
+                  <form onSubmit={handleAddTask} className="space-y-3">
                   {/* Task History Selector */}
                   {taskHistory.length > 0 && (
                     <div>
@@ -1037,221 +1183,11 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                     </button>
                   </div>
                 </form>
+                )}
               </div>
             </div>
 
-            {/* ========== COLUMN B: EXÉCUTER ========== */}
-            <div className="space-y-6">
-              {/* Task List */}
-              <div className={`${themeClasses.card} border rounded-2xl p-6`}>
-                <h2 className="text-lg font-semibold mb-4">📋 Mes tâches</h2>
-
-                <div className="space-y-2">
-                  {tasks.length === 0 ? (
-                    <p className={`text-[11px] ${themeClasses.textMuted} text-center py-8`}>
-                      Aucune tâche. Créez-en une pour commencer !
-                    </p>
-                  ) : (
-                    tasks.map(task => (
-                      <div
-                        key={task.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, task)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, task)}
-                        onDragEnd={handleDragEnd}
-                        onClick={() => task.status !== 'done' && handleTaskClick(task.id)}
-                        className={`border rounded-lg p-4 cursor-move transition-all ${
-                          task.id === activeTaskId
-                            ? themeClasses.taskCardActive
-                            : task.status === 'done'
-                            ? `${themeClasses.taskCardDone} opacity-60`
-                            : themeClasses.taskCard
-                        } ${draggedTask?.id === task.id ? 'opacity-50' : ''}`}
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex items-center gap-2 flex-1">
-                            <span className={`${themeClasses.textMuted} text-xs cursor-grab`}>⋮⋮</span>
-                            <h3 className="text-sm font-semibold flex-1">{task.title}</h3>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[10px] px-2 py-1 rounded ${
-                              task.status === 'todo' ? (theme === 'light' ? 'bg-gray-300 text-gray-700' : 'bg-neutral-700 text-neutral-300') :
-                              task.status === 'doing' ? 'bg-blue-700 text-blue-200' :
-                              task.status === 'paused' ? 'bg-yellow-700 text-yellow-200' :
-                              'bg-green-700 text-green-200'
-                            }`}>
-                              {task.status === 'todo' ? 'À faire' :
-                               task.status === 'doing' ? 'En cours' :
-                               task.status === 'paused' ? 'En pause' :
-                               'Terminé'}
-                            </span>
-                            {task.status === 'done' && (
-                              <button
-                                onClick={(e) => handleReactivateTask(task.id, e)}
-                                className={`${themeClasses.textMuted} hover:text-blue-400 text-sm transition-colors`}
-                                title="Réactiver la tâche"
-                              >
-                                🔄
-                              </button>
-                            )}
-                            <button
-                              onClick={(e) => handleDeleteTask(task.id, e)}
-                              className={`${themeClasses.textMuted} hover:text-red-400 text-sm transition-colors`}
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </div>
-                        <p className={`text-[11px] ${themeClasses.textSecondary} mb-2`}>{task.description}</p>
-                        <div className={`flex justify-between items-center text-[11px] ${themeClasses.textMuted}`}>
-                          <span>⏱️ Estimé: {task.estimateMinutes}min</span>
-                          <span>⏲️ Réel: {Math.floor(task.secondsSpent / 60)}min</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Active Task Timer */}
-              {activeTask && (
-                <div className={`rounded-2xl p-6 transition-all duration-500 ${
-                  isFocusMode
-                    ? 'bg-gradient-to-br from-indigo-900/60 via-purple-900/60 to-pink-900/60 border-2 border-purple-500 shadow-2xl shadow-purple-500/20 scale-105'
-                    : 'bg-gradient-to-br from-blue-900/40 to-purple-900/40 border border-blue-700'
-                }`}>
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-semibold">
-                      {isFocusMode ? '🎯 Mode Focus' : '⏱️ Tâche active'}
-                    </h2>
-                    <div className="flex gap-2">
-                      {!isFocusMode && (
-                        <button
-                          onClick={toggleFocusMode}
-                          className="text-xs rounded-lg px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white cursor-pointer transition-colors"
-                        >
-                          🎯 Mode Focus
-                        </button>
-                      )}
-                      {isFocusMode && (
-                        <button
-                          onClick={toggleFocusMode}
-                          className="text-xs text-neutral-400 hover:text-neutral-200 transition-colors"
-                        >
-                          ✕ Quitter
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Pomodoro Timer (only in focus mode) */}
-                  {isFocusMode && (
-                    <div className="bg-black/30 rounded-xl p-4 mb-4 text-center animate-fade-in">
-                      <div className="text-[10px] text-neutral-400 mb-1 uppercase tracking-wider">
-                        {pomodoroMode === 'work' ? '🎯 Travail Focus' : '☕ Pause'}
-                      </div>
-                      <div className="text-6xl font-bold font-mono mb-2">
-                        {formatPomodoroTime(pomodoroSeconds)}
-                      </div>
-                      <div className="text-[10px] text-neutral-500 mb-3">
-                        🍅 Pomodoros: {pomodoroCount}
-                      </div>
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={handlePomodoroToggle}
-                          className="px-4 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-colors"
-                        >
-                          {isPomodoroRunning ? '⏸️ Pause' : '▶️ Démarrer'}
-                        </button>
-                        <button
-                          onClick={handlePomodoroReset}
-                          className="px-4 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition-colors"
-                        >
-                          🔄 Reset
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Motivational Message (only in focus mode) */}
-                  {isFocusMode && motivationalMessage && (
-                    <div className="mb-4 text-center animate-pulse">
-                      <div className="bg-gradient-to-r from-yellow-400/20 to-orange-400/20 rounded-lg px-4 py-2">
-                        <p className="text-sm font-semibold">{motivationalMessage}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mb-4">
-                    <h3 className="text-xl font-bold mb-2">{activeTask.title}</h3>
-                    <p className="text-sm text-neutral-300">{activeTask.description}</p>
-                  </div>
-
-                  <div className="bg-black/30 rounded-xl p-6 mb-4">
-                    <div className="text-5xl font-mono font-bold text-center mb-2">
-                      {formatTime(activeTask.secondsSpent)}
-                    </div>
-                    <div className="flex justify-center gap-4 text-[11px] text-neutral-400">
-                      <span>Estimé: {activeTask.estimateMinutes}min</span>
-                      <span>|</span>
-                      <span className={
-                        activeTask.secondsSpent > activeTask.estimateMinutes * 60
-                          ? 'text-orange-400'
-                          : 'text-green-400'
-                      }>
-                        Écart: {Math.floor(activeTask.secondsSpent / 60) - activeTask.estimateMinutes}min
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 mb-4">
-                    {isRunning ? (
-                      <button
-                        onClick={handlePause}
-                        className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg px-4 py-3 font-medium transition-colors"
-                      >
-                        ⏸️ Pause
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleResume}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-3 font-medium transition-colors"
-                      >
-                        {activeTask.secondsSpent === 0 ? '▶️ Démarrer' : '▶️ Reprendre'}
-                      </button>
-                    )}
-                    <button
-                      onClick={handleComplete}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-3 font-medium transition-colors"
-                    >
-                      ✅ Terminé
-                    </button>
-                  </div>
-
-                  {/* Block Note */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">⚠️ Blocage actuel ?</label>
-                    <textarea
-                      value={activeTask.blockNote}
-                      onChange={handleBlockNoteChange}
-                      placeholder="Décrivez le problème rencontré..."
-                      rows="3"
-                      className={`w-full ${themeClasses.input} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500`}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {!activeTask && (
-                <div className={`${themeClasses.card} border rounded-2xl p-8 text-center`}>
-                  <p className={`${themeClasses.textMuted} mb-2`}>Aucune tâche active</p>
-                  <p className={`text-[11px] ${themeClasses.textMuted}`}>Cliquez sur une tâche pour démarrer le chrono</p>
-                </div>
-              )}
-            </div>
-
-            {/* ========== COLUMN C: BILAN DU JOUR ========== */}
+            {/* ========== COLUMN B: BILAN DU JOUR ========== */}
             <div className="space-y-6">
               {/* KPIs */}
               <div className={`${themeClasses.card} border rounded-2xl p-6`}>
@@ -1311,9 +1247,17 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
 
               {/* Feedback Personnel */}
               <div className={`${themeClasses.card} border rounded-2xl p-6`}>
-                <h2 className="text-lg font-semibold mb-4">💭 Feedback perso</h2>
+                <h2
+                  className="text-lg font-semibold mb-4 cursor-pointer flex justify-between items-center hover:text-purple-500 transition-colors"
+                  onClick={() => setIsFeedbackOpen(!isFeedbackOpen)}
+                >
+                  <span>💭 Feedback perso</span>
+                  <span className="text-sm">{isFeedbackOpen ? '▼' : '▶'}</span>
+                </h2>
 
-                <textarea
+                {isFeedbackOpen && (
+                  <>
+                    <textarea
                   value={dailyFeedback}
                   onChange={(e) => setDailyFeedback(e.target.value)}
                   placeholder="Comment s'est passée votre journée ? Qu'avez-vous appris ?"
@@ -1352,9 +1296,42 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                     />
                   </div>
                 </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
+        )}
+
+        {activeTab === 'missions' && (
+          <MissionsView
+            missions={missions}
+            setMissions={setMissions}
+            tasks={tasks}
+            activeTaskId={activeTaskId}
+            isRunning={isRunning}
+            isFocusMode={isFocusMode}
+            draggedTask={draggedTask}
+            handleTaskClick={handleTaskClick}
+            handleDragStart={handleDragStart}
+            handleDragOver={handleDragOver}
+            handleDrop={handleDrop}
+            handleDragEnd={handleDragEnd}
+            handleUnifiedPausePlay={handleUnifiedPausePlay}
+            handleMarkDone={handleMarkDone}
+            handleDeleteTask={handleDeleteTask}
+            toggleFocusMode={toggleFocusMode}
+            formatTime={formatTime}
+            formatPomodoroTime={formatPomodoroTime}
+            pomodoroMode={pomodoroMode}
+            pomodoroSeconds={pomodoroSeconds}
+            isPomodoroRunning={isPomodoroRunning}
+            pomodoroCount={pomodoroCount}
+            handlePomodoroToggle={handlePomodoroToggle}
+            handlePomodoroReset={handlePomodoroReset}
+            theme={theme}
+            themeClasses={themeClasses}
+          />
         )}
 
         {activeTab === 'analyze' && (
@@ -1546,6 +1523,80 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                 </div>
               </div>
 
+              {/* Pomodoro Configuration */}
+              <div className={`${themeClasses.bgSecondary} border ${themeClasses.border} rounded-xl p-6`}>
+                <h3 className="text-lg font-semibold mb-4">⏱️ Configuration Pomodoro</h3>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-3">Type de Pomodoro</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setPomodoroConfig({ workMinutes: 25, breakMinutes: 5 })}
+                        className={`px-4 py-3 rounded-lg font-medium transition-all border-2 ${
+                          pomodoroConfig.workMinutes === 25 && pomodoroConfig.breakMinutes === 5
+                            ? 'bg-blue-600 text-white border-blue-500'
+                            : theme === 'light'
+                            ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                            : 'bg-neutral-800 text-neutral-300 border-neutral-700 hover:bg-neutral-700'
+                        }`}
+                      >
+                        <div className="text-lg">🍅 Classique</div>
+                        <div className="text-xs mt-1 opacity-80">25 min / 5 min</div>
+                      </button>
+
+                      <button
+                        onClick={() => setPomodoroConfig({ workMinutes: 50, breakMinutes: 10 })}
+                        className={`px-4 py-3 rounded-lg font-medium transition-all border-2 ${
+                          pomodoroConfig.workMinutes === 50 && pomodoroConfig.breakMinutes === 10
+                            ? 'bg-blue-600 text-white border-blue-500'
+                            : theme === 'light'
+                            ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                            : 'bg-neutral-800 text-neutral-300 border-neutral-700 hover:bg-neutral-700'
+                        }`}
+                      >
+                        <div className="text-lg">🚀 Deep Work</div>
+                        <div className="text-xs mt-1 opacity-80">50 min / 10 min</div>
+                      </button>
+
+                      <button
+                        onClick={() => setPomodoroConfig({ workMinutes: 90, breakMinutes: 20 })}
+                        className={`px-4 py-3 rounded-lg font-medium transition-all border-2 ${
+                          pomodoroConfig.workMinutes === 90 && pomodoroConfig.breakMinutes === 20
+                            ? 'bg-blue-600 text-white border-blue-500'
+                            : theme === 'light'
+                            ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                            : 'bg-neutral-800 text-neutral-300 border-neutral-700 hover:bg-neutral-700'
+                        }`}
+                      >
+                        <div className="text-lg">⚡ Ultra Focus</div>
+                        <div className="text-xs mt-1 opacity-80">90 min / 20 min</div>
+                      </button>
+
+                      <button
+                        onClick={() => setPomodoroConfig({ workMinutes: 15, breakMinutes: 3 })}
+                        className={`px-4 py-3 rounded-lg font-medium transition-all border-2 ${
+                          pomodoroConfig.workMinutes === 15 && pomodoroConfig.breakMinutes === 3
+                            ? 'bg-blue-600 text-white border-blue-500'
+                            : theme === 'light'
+                            ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
+                            : 'bg-neutral-800 text-neutral-300 border-neutral-700 hover:bg-neutral-700'
+                        }`}
+                      >
+                        <div className="text-lg">⚡ Sprint</div>
+                        <div className="text-xs mt-1 opacity-80">15 min / 3 min</div>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className={`${theme === 'light' ? 'bg-blue-50 border-blue-200' : 'bg-blue-900/20 border-blue-800'} border rounded-lg p-3`}>
+                    <p className="text-xs">
+                      <strong>Actuel :</strong> {pomodoroConfig.workMinutes} min travail / {pomodoroConfig.breakMinutes} min pause
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Firebase Status */}
               {!supabaseConfigured && (
                 <div className={`${themeClasses.bgSecondary} border-2 ${theme === 'light' ? 'border-blue-300 bg-blue-50' : 'border-blue-800 bg-blue-900/20'} rounded-xl p-6`}>
@@ -1587,7 +1638,6 @@ function TaskCoachApp({ user, theme: initialTheme, setTheme: setParentTheme, sup
                 <h3 className="text-lg font-semibold mb-4">⏰ Paramètres à venir</h3>
                 <ul className={`list-disc list-inside space-y-2 text-sm ${themeClasses.textSecondary} ml-4`}>
                   <li>Heure de début de journée (par défaut 9h00)</li>
-                  <li>Durée d'un bloc focus (Pomodoro 25min, Deep Work 50min, Custom...)</li>
                   <li>Rappels automatiques (pause, hydratation, étirements)</li>
                   <li>Objectif de temps productif quotidien</li>
                   <li>Notifications pour les tâches dépassant l'estimation</li>

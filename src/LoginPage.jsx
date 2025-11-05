@@ -66,7 +66,7 @@ function LoginPage({ theme }) {
         <div className="text-center mb-8">
           <div className="text-6xl mb-4">🎯</div>
           <h1 className={`text-3xl font-bold ${classes.text} mb-2`}>
-            ProductivityHub
+            ProducHub
           </h1>
           <p className={`${classes.textSecondary}`}>
             Votre coach personnel de productivité
