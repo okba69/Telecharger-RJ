@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - claude/resume-professional-work-011CUbkhfzVBz5ECCAc8pvAA
+      - claude/setup-pro-environment-011CUpQv4iXfn4wePgjY16aL
 
 permissions:
   contents: read
