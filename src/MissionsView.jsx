@@ -28,6 +28,20 @@ function MissionsView({
   theme,
   themeClasses
 }) {
+  // Safety check: ensure all required props are provided
+  if (!tasks || !Array.isArray(tasks)) {
+    return <div className="p-8 text-center text-red-500">Erreur: tasks invalide</div>
+  }
+
+  if (!missions || !Array.isArray(missions)) {
+    return <div className="p-8 text-center text-red-500">Erreur: missions invalide</div>
+  }
+
+  if (!themeClasses) {
+    return <div className="p-8 text-center text-red-500">Erreur: themeClasses manquant</div>
+  }
+
+  try {
   const [newMissionTitle, setNewMissionTitle] = useState('')
   const [newMissionDescription, setNewMissionDescription] = useState('')
   const [newMissionCategory, setNewMissionCategory] = useState('work')
@@ -556,6 +570,16 @@ function MissionsView({
       </div>
     </div>
   )
+  } catch (error) {
+    console.error('Erreur dans MissionsView:', error)
+    return (
+      <div className="p-8 text-center">
+        <div className="text-red-500 text-lg font-bold mb-4">⚠️ Erreur lors du chargement de la page Missions</div>
+        <div className="text-sm text-gray-600 mb-2">Détails: {error.message}</div>
+        <div className="text-xs text-gray-500">Vérifiez la console pour plus d'informations</div>
+      </div>
+    )
+  }
 }
 
 // ========== MISSION CARD COMPONENT ==========
